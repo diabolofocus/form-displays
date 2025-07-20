@@ -1,8 +1,8 @@
 // ==============================================
-// UPDATED: src/dashboard/pages/components/GenericSubmissionTable.tsx - Fixed Errors
+// FULLY FIXED: src/dashboard/pages/components/GenericSubmissionTable.tsx - Complete Fix
 // ==============================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Button,
     Text,
@@ -21,10 +21,12 @@ import {
 import * as Icons from '@wix/wix-ui-icons-common';
 import { GenericSubmission, FormField, FieldType } from '../types';
 import { formatToGermanDate } from '../utils/helpers';
+import { useSettings } from '../hooks/useSettings';
 
 interface GenericSubmissionTableProps {
     submissions: GenericSubmission[];
     formFields: FormField[];
+    formId: string | null;
     onViewSubmission: (submission: GenericSubmission) => void;
     onPrintSubmission: (submission: GenericSubmission) => void;
     onDeleteSubmission: (submissionId: string) => void;
@@ -39,6 +41,7 @@ const ITEMS_PER_PAGE = 40;
 export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     submissions,
     formFields,
+    formId,
     onViewSubmission,
     onPrintSubmission,
     onDeleteSubmission,
@@ -50,6 +53,34 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     const [currentPage, setCurrentPage] = useState(1);
     const [sortField, setSortField] = useState<string>('_createdDate');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+    // Use settings to get visible columns - now returns memoized visibleColumns directly
+    const { visibleColumns, settings, isLoading: settingsLoading } = useSettings(formId, formFields);
+
+    // CRITICAL: Ensure we only use settings that match the current form
+    const safeVisibleColumns = useMemo(() => {
+        if (!formId) {
+            console.log('GenericSubmissionTable: No formId, using all fields');
+            return formFields;
+        }
+
+        if (settings && settings.formId !== formId) {
+            console.log('GenericSubmissionTable: Settings form mismatch!', {
+                settingsFormId: settings.formId,
+                currentFormId: formId
+            });
+            return formFields; // Use all fields if settings don't match
+        }
+
+        console.log('GenericSubmissionTable: Using visible columns for form', formId, ':', visibleColumns.length);
+        return visibleColumns;
+    }, [visibleColumns, settings, formId, formFields]);
+
+    // Log when safeVisibleColumns change for debugging
+    useEffect(() => {
+        console.log('GenericSubmissionTable: safeVisibleColumns changed:', safeVisibleColumns.length);
+        console.log('GenericSubmissionTable: settings:', settings ? { formId: settings.formId, valid: settings.formId === formId } : null);
+    }, [safeVisibleColumns, settings, formId]);
 
     // Filter submissions based on search term
     const filteredSubmissions = submissions.filter(submission => {
@@ -103,10 +134,42 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
         }
     };
 
-    // Display all fields plus creation date
-    const displayFields = getDisplayFields(formFields);
+    // Get column width from settings or use default
+    const getColumnWidth = (field: FormField, index: number): string => {
+        if (settings && settings.formId === formId) {
+            const columnSetting = settings.columns.find(col => col.fieldName === field.name);
+            if (columnSetting?.width) {
+                return columnSetting.width;
+            }
+        }
+
+        // Fallback to default widths
+        return getDefaultColumnWidth(field, index);
+    };
 
     const hasNoSubmissions = submissions.length === 0;
+
+    // Show loading state while settings are loading OR if settings don't match current form
+    if (settingsLoading) {
+        return (
+            <Box direction="vertical" gap="SP4">
+                <Card>
+                    <Box padding="40px" textAlign="center">
+                        <Text>Loading table settings...</Text>
+                    </Box>
+                </Card>
+            </Box>
+        );
+    }
+
+    // Show warning if settings don't match current form
+    if (settings && formId && settings.formId !== formId) {
+        console.warn('GenericSubmissionTable: Settings form mismatch detected!', {
+            settingsFormId: settings.formId,
+            currentFormId: formId,
+            usingFallback: true
+        });
+    }
 
     return (
         <Box direction="vertical" gap="SP4">
@@ -148,7 +211,6 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         table-layout: fixed;
                     }
                     
-                    /* Ensure consistent cell alignment */
                     .table-cell {
                         text-overflow: ellipsis;
                         overflow: hidden;
@@ -177,7 +239,8 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         position: sticky !important;
                         right: 0px !important;
                         z-index: 1 !important;
-                        
+                        background-color: white !important;
+                        box-shadow: -2px 0 4px rgba(0,0,0,0.1);
                     }
                 `}</style>
 
@@ -192,11 +255,18 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                     }
                                 </Text>
                             </TableToolbar.Item>
-                            {displayFields.length > 6 && (
+                            {safeVisibleColumns.length > 6 && (
                                 <TableToolbar.Item>
                                     <Text size="small" color="secondary">
-                                        {displayFields.length} columns • Scroll horizontally for more →
+                                        {safeVisibleColumns.length} columns • Scroll horizontally for more →
                                     </Text>
+                                </TableToolbar.Item>
+                            )}
+                            {settings && settings.formId === formId && (
+                                <TableToolbar.Item>
+                                    <Badge skin="neutralLight" size="small">
+                                        {safeVisibleColumns.length} of {settings.columns.length} columns shown
+                                    </Badge>
                                 </TableToolbar.Item>
                             )}
                         </TableToolbar.ItemGroup>
@@ -236,7 +306,7 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                 display: 'flex'
                             }}
                         >
-                            {displayFields.map((field, index) => (
+                            {safeVisibleColumns.map((field, index) => (
                                 <div
                                     key={field.name}
                                     style={{
@@ -338,7 +408,7 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                         }}
                                         className="table-row-hover"
                                     >
-                                        {displayFields.map((field, index) => (
+                                        {safeVisibleColumns.map((field, index) => (
                                             <div
                                                 key={field.name}
                                                 style={{
@@ -447,76 +517,39 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     );
 };
 
-// Helper functions
-
-function getDisplayFields(formFields: FormField[]): FormField[] {
-    // Always include creation date first
-    const createdDateField: FormField = {
-        name: '_createdDate',
-        label: 'Created',
-        type: FieldType.DATE
-    };
-
-    // Sort form fields by priority for better column ordering
-    const sortedFields = [...formFields].sort((a, b) => {
-        const priorityA = getFieldPriority(a.name);
-        const priorityB = getFieldPriority(b.name);
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        return a.label.localeCompare(b.label);
-    });
-
-    // Return creation date + all form fields
-    return [createdDateField, ...sortedFields];
-}
-
-function getFieldPriority(fieldName: string): number {
-    const name = fieldName.toLowerCase();
-
-    // Higher priority (lower number) for important fields
-    if (name.includes('name') || name.includes('vorname') || name.includes('nachname')) return 1;
-    if (name.includes('email') || name.includes('mail')) return 2;
-    if (name.includes('telefon') || name.includes('phone')) return 3;
-    if (name.includes('geburt') || name.includes('birth') || name.includes('age')) return 4;
-    if (name.includes('geschlecht') || name.includes('gender')) return 5;
-    if (name.includes('datum') || name.includes('date')) return 6;
-    if (name.includes('adresse') || name.includes('address')) return 7;
-
-    return 999; // Default priority for other fields
-}
-
-function getColumnWidth(field: FormField, index: number): string {
-    // Fixed widths for better alignment between headers and data
+// Default column width fallback function
+function getDefaultColumnWidth(field: FormField, index: number): string {
     const fieldName = field.name.toLowerCase();
 
     // First column (Created date)
     if (index === 0) return '110px';
 
-    // Name fields - need more space for full names
+    // Name fields
     if (fieldName.includes('name') || fieldName.includes('vorname') || fieldName.includes('nachname')) {
         return '140px';
     }
 
-    // Email fields - need space for full email addresses
+    // Email fields
     if (field.type === FieldType.EMAIL || fieldName.includes('email') || fieldName.includes('mail')) {
         return '200px';
     }
 
-    // Phone fields - consistent width for phone numbers
+    // Phone fields
     if (field.type === FieldType.PHONE || fieldName.includes('telefon') || fieldName.includes('phone')) {
         return '130px';
     }
 
-    // Date fields - consistent width for dates
+    // Date fields
     if (field.type === FieldType.DATE || fieldName.includes('datum') || fieldName.includes('date') || fieldName.includes('birth')) {
         return '100px';
     }
 
-    // Boolean/Short answer fields - smaller width
+    // Boolean/Short answer fields
     if (field.type === FieldType.BOOLEAN || fieldName.includes('activ') || fieldName.includes('mailbox')) {
         return '90px';
     }
 
-    // Address fields - need more space
+    // Address fields
     if (fieldName.includes('address') || fieldName.includes('adresse') || fieldName.includes('street') || fieldName.includes('strasse')) {
         return '180px';
     }
@@ -547,7 +580,6 @@ function renderFieldValue(submission: GenericSubmission, field: FormField, isFir
         return <Text size="small" color="disabled">-</Text>;
     }
 
-    // Special rendering for first column (creation date WITHOUT avatar)
     if (isFirstColumn) {
         return (
             <Text size="small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -556,7 +588,6 @@ function renderFieldValue(submission: GenericSubmission, field: FormField, isFir
         );
     }
 
-    // Enhanced rendering based on field type and value analysis
     return (
         <Box style={{ width: '100%', overflow: 'hidden' }}>
             {renderValueByType(value, field)}
@@ -565,9 +596,6 @@ function renderFieldValue(submission: GenericSubmission, field: FormField, isFir
 }
 
 function renderValueByType(value: any, field: FormField): React.ReactNode {
-    // Handle different data types with appropriate rendering
-
-    // Check for string URLs that might be images
     if (typeof value === 'string' && isImageUrl(value)) {
         return (
             <Box direction="horizontal" gap="SP1" align="center">
@@ -590,84 +618,22 @@ function renderValueByType(value: any, field: FormField): React.ReactNode {
         );
     }
 
-    // Arrays - render as tags or list items with smart content detection
     if (Array.isArray(value)) {
         if (value.length === 0) {
             return <Text size="small" color="disabled">Empty array</Text>;
         }
 
-        // Check if array contains images
-        const hasImages = value.some(item =>
-            (typeof item === 'string' && isImageUrl(item)) ||
-            (typeof item === 'object' && item && item.url && isImageUrl(item.url))
-        );
-
-        if (hasImages && value.length <= 3) {
-            return (
-                <Box direction="horizontal" gap="SP1" style={{ flexWrap: 'wrap' }}>
-                    {value.slice(0, 3).map((item, index) => {
-                        if (typeof item === 'string' && isImageUrl(item)) {
-                            return (
-                                <img
-                                    key={index}
-                                    src={item}
-                                    alt="Image"
-                                    style={{
-                                        width: '24px',
-                                        height: '24px',
-                                        objectFit: 'cover',
-                                        borderRadius: '4px',
-                                        border: '1px solid #e0e0e0'
-                                    }}
-                                    onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                    }}
-                                />
-                            );
-                        }
-                        if (typeof item === 'object' && item && item.url && isImageUrl(item.url)) {
-                            return (
-                                <img
-                                    key={index}
-                                    src={item.url}
-                                    alt="Image"
-                                    style={{
-                                        width: '24px',
-                                        height: '24px',
-                                        objectFit: 'cover',
-                                        borderRadius: '4px',
-                                        border: '1px solid #e0e0e0'
-                                    }}
-                                    onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                    }}
-                                />
-                            );
-                        }
-                        return null;
-                    })}
-                </Box>
-            );
-        }
-
-        // If array has many items, show count with preview
         if (value.length > 4) {
-            const previewItems = value.slice(0, 2);
-            const previewText = previewItems.map(item => getItemPreview(item)).join(', ');
             return (
                 <Box direction="horizontal" gap="SP1" align="center">
                     <Badge skin="neutralLight" size="small">{value.length} items</Badge>
-                    <Text size="tiny" color="secondary" ellipsis title={previewText}>
-                        {previewText}...
-                    </Text>
                 </Box>
             );
         }
 
-        // For manageable arrays, show as tags with rich content
         const tagData = value.slice(0, 4).map((item, index) => ({
             id: `tag-${index}`,
-            children: getItemPreview(item, 25) // Limit tag content length
+            children: String(item).substring(0, 25)
         }));
 
         return (
@@ -679,340 +645,24 @@ function renderValueByType(value: any, field: FormField): React.ReactNode {
         );
     }
 
-    // Objects - handle special object types and rich content
     if (typeof value === 'object' && value !== null) {
-        return renderObjectValue(value);
+        return <Text size="small" ellipsis>Object</Text>;
     }
 
-    // Strings - check for special patterns and rich content
-    if (typeof value === 'string') {
-        return renderStringValue(value, field);
+    if (field.type === FieldType.BOOLEAN) {
+        return (
+            <Badge skin={value ? 'success' : 'neutralLight'} size="small">
+                {value ? 'Yes' : 'No'}
+            </Badge>
+        );
     }
 
-    // Numbers
-    if (typeof value === 'number') {
-        return <Text size="small">{value.toLocaleString()}</Text>;
-    }
-
-    // Handle other specific field types
-    switch (field.type) {
-        case FieldType.DATE:
-            if (typeof value === 'string') {
-                return <Text size="small">{formatToGermanDate(value)}</Text>;
-            }
-            break;
-
-        case FieldType.BOOLEAN:
-            return (
-                <Badge skin={value ? 'success' : 'neutralLight'} size="small">
-                    {value ? 'Yes' : 'No'}
-                </Badge>
-            );
-    }
-
-    // Default rendering
     return <Text size="small" ellipsis>{formatValue(value, field.type)}</Text>;
 }
 
-// Enhanced helper to get meaningful preview of any item
-function getItemPreview(item: any, maxLength: number = 30): string {
-    if (item === null || item === undefined) {
-        return 'null';
-    }
-
-    if (typeof item === 'string') {
-        return item.length > maxLength ? item.substring(0, maxLength - 3) + '...' : item;
-    }
-
-    if (typeof item === 'number' || typeof item === 'boolean') {
-        return String(item);
-    }
-
-    if (typeof item === 'object') {
-        // Handle special object types
-        if (item.url) {
-            if (isImageUrl(item.url)) {
-                return '🖼️ Image';
-            }
-            return '📄 File';
-        }
-
-        if (item.street || item.city || item.zipCode) {
-            const parts = [item.street, item.city, item.zipCode].filter(Boolean);
-            const address = parts.join(', ');
-            return address.length > maxLength ? address.substring(0, maxLength - 3) + '...' : address;
-        }
-
-        if (item.name || item.title || item.label) {
-            const name = item.name || item.title || item.label;
-            return String(name).length > maxLength ? String(name).substring(0, maxLength - 3) + '...' : String(name);
-        }
-
-        if (item.value !== undefined) {
-            return getItemPreview(item.value, maxLength);
-        }
-
-        // For generic objects, show key count and first meaningful key
-        const keys = Object.keys(item);
-        if (keys.length === 0) {
-            return 'Empty object';
-        }
-
-        const firstKey = keys[0];
-        const firstValue = item[firstKey];
-        if (typeof firstValue === 'string' && firstValue.length > 0) {
-            return `${firstKey}: ${firstValue.substring(0, 15)}`;
-        }
-
-        return `Object (${keys.length} keys)`;
-    }
-
-    return String(item).substring(0, maxLength);
-}
-
-// Enhanced object rendering
-function renderObjectValue(obj: any): React.ReactNode {
-    // Image/File objects - improved detection
-    if (obj.url && typeof obj.url === 'string') {
-        if (isImageUrl(obj.url)) {
-            return (
-                <Box direction="horizontal" gap="SP1" align="center">
-                    <img
-                        src={obj.url}
-                        alt="Image"
-                        style={{
-                            width: '32px',
-                            height: '32px',
-                            objectFit: 'cover',
-                            borderRadius: '4px',
-                            border: '1px solid #e0e0e0'
-                        }}
-                        onError={(e) => {
-                            // If image fails to load, show a placeholder
-                            const target = e.currentTarget;
-                            target.style.display = 'none';
-                            if (target.nextSibling) {
-                                (target.nextSibling as HTMLElement).textContent = '🖼️ Image (failed)';
-                            }
-                        }}
-                    />
-                    <Text size="small" color="secondary">
-                        {obj.name ? obj.name.substring(0, 20) : 'Image'}
-                    </Text>
-                </Box>
-            );
-        } else {
-            return (
-                <Box direction="horizontal" gap="SP1" align="center">
-                    <Icons.ExternalLink size="16px" />
-                    <Text size="small" ellipsis>
-                        {obj.name || 'File'}
-                    </Text>
-                    {obj.size && (
-                        <Text size="tiny" color="secondary">
-                            ({formatFileSize(obj.size)})
-                        </Text>
-                    )}
-                </Box>
-            );
-        }
-    }
-
-    // Check if the object itself might be an image with different structure
-    if (obj.type && typeof obj.type === 'string' && obj.type.startsWith('image/')) {
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Text size="small">🖼️ Image</Text>
-                {obj.name && (
-                    <Text size="tiny" color="secondary" ellipsis>
-                        {obj.name}
-                    </Text>
-                )}
-            </Box>
-        );
-    }
-
-    // Address objects
-    if (obj.street || obj.city || obj.zipCode || obj.country) {
-        const addressParts = [obj.street, obj.city, obj.state, obj.zipCode, obj.country].filter(Boolean);
-        const fullAddress = addressParts.join(', ');
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Icons.Home size="16px" />
-                <Text size="small" ellipsis title={fullAddress}>
-                    {fullAddress.length > 35 ? fullAddress.substring(0, 32) + '...' : fullAddress}
-                </Text>
-            </Box>
-        );
-    }
-
-    // Contact objects
-    if (obj.email || obj.phone) {
-        return (
-            <Box direction="vertical" gap="SP0">
-                {obj.email && (
-                    <Text size="small" ellipsis>{obj.email}</Text>
-                )}
-                {obj.phone && (
-                    <Text size="tiny" color="secondary">{obj.phone}</Text>
-                )}
-            </Box>
-        );
-    }
-
-    // Named objects (with name, title, or label)
-    if (obj.name || obj.title || obj.label) {
-        const displayName = obj.name || obj.title || obj.label;
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Text size="small" ellipsis>{displayName}</Text>
-                {obj.value !== undefined && (
-                    <Text size="tiny" color="secondary" ellipsis>
-                        ({getItemPreview(obj.value, 15)})
-                    </Text>
-                )}
-            </Box>
-        );
-    }
-
-    // Date objects
-    if (obj.date || obj.timestamp || obj.created || obj.updated) {
-        const dateValue = obj.date || obj.timestamp || obj.created || obj.updated;
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Icons.Date size="16px" />
-                <Text size="small">{formatToGermanDate(dateValue)}</Text>
-            </Box>
-        );
-    }
-
-    // Generic object with meaningful content
-    const keys = Object.keys(obj);
-    if (keys.length === 0) {
-        return <Text size="small" color="disabled">Empty object</Text>;
-    }
-
-    // Show first meaningful key-value pair
-    const meaningfulKey = keys.find(key => {
-        const value = obj[key];
-        return typeof value === 'string' && value.length > 0 && value.length < 50;
-    }) || keys[0];
-
-    const value = obj[meaningfulKey];
-
-    return (
-        <Box direction="horizontal" gap="SP1" align="center">
-            <Badge skin="neutralLight" size="small">{keys.length} fields</Badge>
-            <Text size="tiny" color="secondary" ellipsis>
-                {meaningfulKey}: {getItemPreview(value, 15)}
-            </Text>
-        </Box>
-    );
-}
-
-// Enhanced string rendering
-function renderStringValue(value: string, field: FormField): React.ReactNode {
-    // Email
-    if (field.type === FieldType.EMAIL || isEmail(value)) {
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Icons.Email size="16px" />
-                <Text size="small" ellipsis>{value}</Text>
-            </Box>
-        );
-    }
-
-    // Phone
-    if (field.type === FieldType.PHONE || isPhone(value)) {
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Icons.Phone size="16px" />
-                <Text size="small">{value}</Text>
-            </Box>
-        );
-    }
-
-    // URL
-    if (field.type === FieldType.URL || isUrl(value)) {
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Icons.ExternalLink size="16px" />
-                <Text size="small" ellipsis>{value}</Text>
-            </Box>
-        );
-    }
-
-    // Long text / textarea
-    if (field.type === FieldType.TEXTAREA || value.length > 100) {
-        return (
-            <Text size="small" ellipsis title={value}>
-                {value.substring(0, 40)}...
-            </Text>
-        );
-    }
-
-    // Rich text detection (HTML)
-    if (value.includes('<') && value.includes('>')) {
-        const textContent = value.replace(/<[^>]*>/g, '').trim();
-        return (
-            <Box direction="horizontal" gap="SP1" align="center">
-                <Icons.Text size="16px" />
-                <Text size="small" ellipsis title={textContent}>
-                    {textContent.substring(0, 30)}...
-                </Text>
-            </Box>
-        );
-    }
-
-    // Default string
-    return <Text size="small" ellipsis>{value}</Text>;
-}
-
-// Helper function to format file sizes
-function formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-// Helper functions for type detection
 function isImageUrl(url: string): boolean {
     if (!url || typeof url !== 'string') return false;
-
-    // Check for common image extensions
-    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico|avif)(\?|$|#)/i;
-    if (imageExtensions.test(url)) return true;
-
-    // Check for data URLs
-    if (url.startsWith('data:image/')) return true;
-
-    // Check for Wix media URLs
-    if (url.includes('wixmp.com') || url.includes('wixstatic.com')) return true;
-
-    // Check for common image hosting services
-    const imageHosts = /(imgur|cloudinary|unsplash|pexels|pixabay|amazonaws|googleusercontent)/i;
-    if (imageHosts.test(url)) return true;
-
-    return false;
-}
-
-function isEmail(value: string): boolean {
-    return /\S+@\S+\.\S+/.test(value);
-}
-
-function isPhone(value: string): boolean {
-    return /^[\+\d\s\-\(\)]+$/.test(value) && value.length > 5;
-}
-
-function isUrl(value: string): boolean {
-    try {
-        new URL(value);
-        return true;
-    } catch {
-        return /^https?:\/\/.+/.test(value);
-    }
+    return /\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico|avif)(\?|$|#)/i.test(url);
 }
 
 function formatValue(value: any, type: FieldType): string {
@@ -1029,7 +679,6 @@ function formatValue(value: any, type: FieldType): string {
             return typeof value === 'object' ? 'Object' : String(value);
         default:
             const str = String(value);
-            // Shorter truncation for tables with many columns
             return str.length > 30 ? str.substring(0, 27) + '...' : str;
     }
 }

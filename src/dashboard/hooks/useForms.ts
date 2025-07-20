@@ -1,12 +1,13 @@
 // ==============================================
-// NEW: src/dashboard/pages/hooks/useForms.ts
+// FIXED: src/dashboard/pages/hooks/useForms.ts - Better Form Selection Persistence
 // ==============================================
 
 import { useState, useEffect, useMemo } from 'react';
 import { GenericSubmission, FormInfo, FormField, FieldType } from '../types';
 
 export const useForms = (allSubmissions: GenericSubmission[]) => {
-    const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+    const [selectedFormId, setSelectedFormIdState] = useState<string | null>(null);
+    const [hasInitialized, setHasInitialized] = useState(false);
 
     // Extract all available forms from submissions
     const availableForms = useMemo(() => {
@@ -51,12 +52,82 @@ export const useForms = (allSubmissions: GenericSubmission[]) => {
         return availableForms.find(form => form.formId === selectedFormId) || null;
     }, [availableForms, selectedFormId]);
 
-    // Auto-select the form with the most submissions if none selected
+    // Enhanced form selection function with persistence
+    const setSelectedFormId = (formId: string) => {
+        console.log('useForms: Setting form ID to:', formId);
+
+        // Store IMMEDIATELY in window for persistence across navigation
+        if (typeof window !== 'undefined') {
+            window.wixCurrentFormId = formId;
+            console.log('useForms: Stored form ID in window IMMEDIATELY:', formId);
+        }
+
+        setSelectedFormIdState(formId);
+    };
+
+    // Force restoration check on every render when forms are available
     useEffect(() => {
+        if (availableForms.length === 0) return;
+
+        console.log('useForms: Checking form selection...');
+        console.log('useForms: Current selectedFormId:', selectedFormId);
+        console.log('useForms: Available forms:', availableForms.map(f => ({ id: f.formId, name: f.name })));
+
+        // Always check window storage first
+        if (typeof window !== 'undefined' && window.wixCurrentFormId) {
+            const storedFormId = window.wixCurrentFormId;
+            const formExists = availableForms.some(form => form.formId === storedFormId);
+
+            console.log('useForms: Found stored form ID:', storedFormId);
+            console.log('useForms: Form exists in available forms:', formExists);
+
+            if (formExists && storedFormId !== selectedFormId) {
+                console.log('useForms: Restoring form selection from storage:', storedFormId);
+                setSelectedFormIdState(storedFormId);
+                return;
+            }
+        }
+
+        // If no stored selection or stored selection doesn't exist, auto-select first form
         if (!selectedFormId && availableForms.length > 0) {
-            setSelectedFormId(availableForms[0].formId);
+            const firstFormId = availableForms[0].formId;
+            console.log('useForms: Auto-selecting first form:', firstFormId);
+            setSelectedFormIdState(firstFormId);
+            if (typeof window !== 'undefined') {
+                window.wixCurrentFormId = firstFormId;
+            }
+        }
+
+        // Validate current selection still exists
+        if (selectedFormId && !availableForms.some(form => form.formId === selectedFormId)) {
+            console.log('useForms: Current selection invalid, resetting');
+            const firstFormId = availableForms[0].formId;
+            setSelectedFormIdState(firstFormId);
+            if (typeof window !== 'undefined') {
+                window.wixCurrentFormId = firstFormId;
+            }
         }
     }, [availableForms, selectedFormId]);
+
+    // Reset when submissions change significantly
+    useEffect(() => {
+        if (allSubmissions.length === 0) {
+            setSelectedFormIdState(null);
+            if (typeof window !== 'undefined') {
+                delete window.wixCurrentFormId;
+            }
+        }
+    }, [allSubmissions.length]);
+
+    // Debug logging
+    useEffect(() => {
+        console.log('useForms: Current state:', {
+            selectedFormId,
+            availableFormsCount: availableForms.length,
+            selectedFormSubmissionsCount: selectedFormSubmissions.length,
+            windowFormId: typeof window !== 'undefined' ? window.wixCurrentFormId : 'undefined'
+        });
+    }, [selectedFormId, availableForms.length, selectedFormSubmissions.length]);
 
     return {
         availableForms,
@@ -67,7 +138,7 @@ export const useForms = (allSubmissions: GenericSubmission[]) => {
     };
 };
 
-// Analyze form structure from submissions
+// Rest of the functions remain the same...
 function analyzeFormStructure(formId: string, submissions: GenericSubmission[], lastSubmissionDate: string): FormInfo {
     const fieldMap = new Map<string, {
         name: string;

@@ -1,5 +1,5 @@
 // ==============================================
-// NEW: src/dashboard/pages/components/FormSelector.tsx
+// FIXED: src/dashboard/pages/components/FormSelector.tsx
 // ==============================================
 
 import React from 'react';
@@ -52,7 +52,18 @@ export const FormSelector: React.FC<FormSelectorProps> = ({
                     placeholder="Choose form..."
                     options={dropdownOptions}
                     selectedId={selectedFormId || undefined}
-                    onSelect={(option) => onFormSelect(String(option.id))}
+                    onSelect={(option) => {
+                        const formId = String(option.id);
+                        console.log('FormSelector: Form selected:', formId);
+
+                        // Store immediately for navigation persistence
+                        if (typeof window !== 'undefined') {
+                            window.wixCurrentFormId = formId;
+                            console.log('FormSelector: Stored form ID immediately:', formId);
+                        }
+
+                        onFormSelect(formId);
+                    }}
                     disabled={loading}
                     size="medium"
                 />
@@ -73,7 +84,7 @@ export const FormSelector: React.FC<FormSelectorProps> = ({
                             content={`Last submission: ${formatToGermanDate(selectedForm.lastSubmissionDate)}`}
                             placement="bottom"
                         >
-                            <Badge skin="successLight" size="small">
+                            <Badge skin="success" size="small">
                                 Active
                             </Badge>
                         </Tooltip>

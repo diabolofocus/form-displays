@@ -1,5 +1,5 @@
 // ==============================================
-// UPDATED: src/dashboard/pages/index.tsx - Generic Form Dashboard
+// FIXED: src/dashboard/pages/patienten/page.tsx 
 // ==============================================
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -13,7 +13,8 @@ import {
   Modal,
   MessageModalLayout,
   TextButton,
-  Loader
+  Loader,
+  Card
 } from '@wix/design-system';
 import '@wix/design-system/styles.global.css';
 import * as Icons from '@wix/wix-ui-icons-common';
@@ -28,6 +29,13 @@ import { printPatientDetails } from '../../utils/printUtils';
 import { submissions } from '@wix/forms';
 import { GenericSubmission, PatientSubmission } from '../../types';
 
+declare global {
+  interface Window {
+    wixFormDashboardSettings?: import('../../hooks/useSettings').FormSettings[];
+    wixCurrentFormId?: string;
+  }
+}
+
 const GenericFormDashboard: React.FC = () => {
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
@@ -39,6 +47,7 @@ const GenericFormDashboard: React.FC = () => {
   const [submissionToEdit, setSubmissionToEdit] = useState<GenericSubmission | null>(null);
   const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showDebug, setShowDebug] = useState(true); // Set to false to hide debug panel
 
   // Use the patient data hook (now returns GenericSubmission[])
   const {
@@ -50,7 +59,6 @@ const GenericFormDashboard: React.FC = () => {
     calculateGenderGroups
   } = usePatientData();
 
-  // Use the forms hook to manage form selection
   const {
     availableForms,
     selectedFormId,
@@ -58,6 +66,22 @@ const GenericFormDashboard: React.FC = () => {
     selectedForm,
     selectedFormSubmissions
   } = useForms(allSubmissions);
+
+  // Let useForms handle form selection - remove duplication
+  // The useForms hook now handles all form selection logic
+
+  // Debug logging to ensure form ID is being passed correctly
+  useEffect(() => {
+    if (selectedFormId && selectedForm) {
+      console.log('Main page - Selected form ID:', selectedFormId);
+      console.log('Main page - Selected form:', selectedForm);
+
+      // Store current form ID for navigation
+      if (typeof window !== 'undefined') {
+        window.wixCurrentFormId = selectedFormId;
+      }
+    }
+  }, [selectedFormId, selectedForm]);
 
   // Update time every minute
   useEffect(() => {
@@ -131,7 +155,6 @@ const GenericFormDashboard: React.FC = () => {
   };
 
   const handleAddNewRegistration = () => {
-    // Open a generic form creation page or show available forms
     dashboard.showToast({
       message: 'New form feature not yet available',
       type: 'standard',
@@ -151,7 +174,6 @@ const GenericFormDashboard: React.FC = () => {
 
   const handlePrintSubmission = (submission: GenericSubmission) => {
     console.log('Printing submission:', submission);
-    // For now, use the existing print function with type casting
     printPatientDetails(submission as PatientSubmission);
   };
 
@@ -209,7 +231,6 @@ const GenericFormDashboard: React.FC = () => {
   const getSubmissionDisplayName = (submission: GenericSubmission): string => {
     if (!selectedForm) return submission._id.slice(0, 8);
 
-    // Try to find name fields
     const nameField = selectedForm.fields.find(f =>
       f.name.toLowerCase().includes('name') ||
       f.name.toLowerCase().includes('vorname')
@@ -222,7 +243,6 @@ const GenericFormDashboard: React.FC = () => {
       }
     }
 
-    // Fallback to first non-empty field or ID
     const firstField = selectedForm.fields.find(f => {
       const value = submission.submissions[f.name];
       return typeof value === 'string' && value.trim();
@@ -236,6 +256,13 @@ const GenericFormDashboard: React.FC = () => {
     return `Submission ${submission._id.slice(0, 8)}`;
   };
 
+  const handleNavigateToSettings = () => {
+    // Form persistence is handled by useForms hook automatically
+    dashboard.navigate({
+      pageId: '4e98db9d-26ac-4e7c-b093-782182280fb6'
+    });
+  };
+
   return (
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
       <Page minWidth={950}>
@@ -245,18 +272,20 @@ const GenericFormDashboard: React.FC = () => {
               <FormSelector
                 availableForms={availableForms}
                 selectedFormId={selectedFormId}
-                onFormSelect={setSelectedFormId}
+                onFormSelect={setSelectedFormId} // useForms handles persistence internally
                 loading={loading}
               />
-              <TextButton
-                prefixIcon={<Icons.Hint size="20px" />}
-                size="small"
-                underline="always"
-                onClick={() => setIsWhatsNewOpen(true)}
-                skin="premium"
-              >
-                Info
-              </TextButton>
+              <Box>
+                <TextButton
+                  prefixIcon={<Icons.Hint size="20px" />}
+                  size="small"
+                  underline="always"
+                  onClick={() => setIsWhatsNewOpen(true)}
+                  skin="premium"
+                >
+                  Info
+                </TextButton>
+              </Box>
             </Box>
           }
           subtitle={
@@ -273,6 +302,14 @@ const GenericFormDashboard: React.FC = () => {
           actionsBar={
             <Box direction="horizontal" gap="SP3">
               <Button
+                onClick={handleNavigateToSettings}
+                prefixIcon={<Icons.Settings />}
+                priority="secondary"
+                disabled={!selectedForm}
+              >
+                Table Settings
+              </Button>
+              <Button
                 onClick={handleRefresh}
                 prefixIcon={<Icons.Refresh />}
                 priority="secondary"
@@ -282,7 +319,7 @@ const GenericFormDashboard: React.FC = () => {
               <Button
                 onClick={handleAddNewRegistration}
                 prefixIcon={<Icons.Add />}
-                disabled={true} // Disabled for now
+                disabled={true}
               >
                 New Form
               </Button>
@@ -292,6 +329,42 @@ const GenericFormDashboard: React.FC = () => {
 
         <Page.Content>
           <Box direction="vertical" gap="SP4">
+            {/* Debug Panel */}
+            {showDebug && (
+              <Card>
+                <Card.Header title="Debug Information" />
+                <Card.Content>
+                  <Box direction="vertical" gap="SP2">
+                    <Box direction="horizontal" gap="SP4">
+                      <Text size="small">Selected Form ID: {selectedFormId || 'None'}</Text>
+                      <Text size="small">Window Form ID: {typeof window !== 'undefined' ? window.wixCurrentFormId || 'None' : 'N/A'}</Text>
+                    </Box>
+                    <Box direction="horizontal" gap="SP4">
+                      <Text size="small">Available Forms: {availableForms.length}</Text>
+                      <Text size="small">Selected Form: {selectedForm?.name || 'None'}</Text>
+                    </Box>
+                    <Box direction="horizontal" gap="SP2">
+                      <Button
+                        size="small"
+                        priority="secondary"
+                        onClick={() => {
+                          console.log('Main Debug: Current state:', {
+                            selectedFormId,
+                            windowFormId: typeof window !== 'undefined' ? window.wixCurrentFormId : undefined,
+                            availableForms: availableForms.map(f => ({ id: f.formId, name: f.name })),
+                            selectedForm: selectedForm ? { id: selectedForm.formId, name: selectedForm.name } : null,
+                            allStoredSettings: typeof window !== 'undefined' ? window.wixFormDashboardSettings : undefined
+                          });
+                        }}
+                      >
+                        Log Debug Info
+                      </Button>
+                    </Box>
+                  </Box>
+                </Card.Content>
+              </Card>
+            )}
+
             {/* Statistics Cards */}
             {selectedForm && selectedFormSubmissions.length > 0 && (
               <StatisticsCards
@@ -307,8 +380,10 @@ const GenericFormDashboard: React.FC = () => {
             {/* Main Content */}
             {selectedForm ? (
               <GenericSubmissionTable
+                key={selectedFormId} // Force re-render when form changes
                 submissions={selectedFormSubmissions}
                 formFields={selectedForm.fields}
+                formId={selectedFormId}
                 onViewSubmission={handleViewSubmission}
                 onPrintSubmission={handlePrintSubmission}
                 onDeleteSubmission={handleDeleteSubmission}
@@ -340,7 +415,7 @@ const GenericFormDashboard: React.FC = () => {
       {/* Modals */}
       {isModalOpen && selectedSubmission && (
         <PatientDetailsModal
-          patient={selectedSubmission as PatientSubmission} // Type cast for compatibility
+          patient={selectedSubmission as PatientSubmission}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
           onPrint={handlePrintSubmission}
@@ -392,6 +467,7 @@ const GenericFormDashboard: React.FC = () => {
               <Text>•  Enhanced data display for arrays, objects, and images</Text>
               <Text>•  Generic search function across all fields</Text>
               <Text>•  Automatic type detection (email, phone, date, etc.)</Text>
+              <Text>•  NEW: Table Settings - configure column visibility and order</Text>
             </Box>
 
             <Box textAlign="left" marginTop="16px">
@@ -400,10 +476,12 @@ const GenericFormDashboard: React.FC = () => {
             <Box direction="vertical" gap="8px" marginTop="16px" textAlign="left">
               <Text>•  Select a form from the dropdown list</Text>
               <Text>•  All form fields are automatically displayed as table columns</Text>
+              <Text>•  Use "Table Settings" to hide/show columns and reorder them</Text>
               <Text>•  Search works across all text fields</Text>
               <Text>•  Click on date columns to sort</Text>
               <Text>•  Arrays displayed as tags, objects as structured data</Text>
               <Text>•  Images and files shown with previews</Text>
+              <Text>•  Settings are automatically saved per form</Text>
             </Box>
 
             <Box direction="horizontal" gap="12px" align="right" marginTop="24px">
