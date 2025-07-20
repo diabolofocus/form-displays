@@ -1,0 +1,5 @@
+{
+  "$schema": "https://dev.wix.com/wix-cli/schemas/dashboard-page.json",
+  "id": "18fa5508-c2db-4a9f-8331-54c511277e6a",
+  "title": "form-display"
+}

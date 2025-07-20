@@ -1,0 +1,95 @@
+/* Update: src/dashboard/pages/patienten/styles/dashboard.module.css */
+
+.dashboard {
+    padding: 24px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+.header {
+    margin-bottom: 32px;
+}
+
+.headerActions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* Statistics cards - keep horizontal at top */
+.statisticsSection {
+    margin-bottom: 32px;
+}
+
+/* Main content layout - filter panel on RIGHT side */
+.contentLayout {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    width: 100%;
+    gap: 24px;
+    align-items: stretch;
+}
+
+.filterPanel {
+    height: 100%;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Filter panel - positioned on the right */
+.filterPanel {
+    position: sticky;
+    top: 24px;
+    order: 2;
+    /* Ensure it appears on the right */
+}
+
+/* Main content takes up left side */
+.mainContent {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    order: 1;
+    /* Ensure it appears on the left */
+}
+
+.searchSection {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+}
+
+.tableSection {
+    background: white;
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 100%;
+}
+
+.loadingContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 80px;
+}
+
+.errorContainer {
+    text-align: center;
+    padding: 40px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #f56565;
+    background-color: #fed7d7;
+}
+
+/* Mobile responsiveness */
+
+
+/* Ensure proper vertical spacing */
+.dashboard>*+* {
+    margin-top: 24px;
+}
