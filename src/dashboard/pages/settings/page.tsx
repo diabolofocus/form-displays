@@ -1,5 +1,5 @@
 // ==============================================
-// FIXED: src/dashboard/pages/components/SettingsPage.tsx
+// UPDATED: src/dashboard/pages/components/SettingsPage.tsx
 // ==============================================
 
 import React, { useState, useEffect } from 'react';
@@ -9,6 +9,8 @@ import {
   Box,
   Text,
   Button,
+  Table,
+  TableToolbar,
   TableListHeader,
   TableListItem,
   SortableListBase,
@@ -17,7 +19,6 @@ import {
   Loader,
   Badge,
   WixDesignSystemProvider
-
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
@@ -27,9 +28,10 @@ import { useForms } from '../../hooks/useForms';
 import { usePatientData } from '../../hooks/usePatientData';
 import { FormSelector } from '../../components/FormSelector';
 import { FieldType } from '../../types';
-
+import { formTableSettingsStore } from '../stores/FormTableSettingsStore';
 
 import '@wix/design-system/styles.global.css';
+import { observer } from 'mobx-react-lite';
 
 const SettingsPage: React.FC = () => {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
@@ -48,7 +50,6 @@ const SettingsPage: React.FC = () => {
     resetToDefaults,
     saveSettingsExplicitly
   } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
-
 
   // Debug logging for settings page
   useEffect(() => {
@@ -70,38 +71,124 @@ const SettingsPage: React.FC = () => {
     });
   }, [settings]);
 
-  // Form selection is now handled by useForms hook
-
   const [headerOptions] = useState([
     {
       value: 'Field Name',
       width: '3fr',
       sortable: false,
+      align: 'left' as const,
     },
     {
       value: 'Type',
       width: '2fr',
       sortable: false,
+      align: 'left' as const,
     },
     {
       value: 'Visible',
       width: '1fr',
       sortable: false,
+      align: 'left' as const,
     },
     {
       value: 'Width',
       width: '1fr',
       sortable: false,
+      align: 'left' as const,
     }
   ]);
 
-  // Convert settings to draggable items
-  const items = settings ? settings.columns.map((column, index) => ({
+  // Convert settings to table data for the new Table structure
+  const tableData = settings ? settings.columns.map((column, index) => ({
     id: column.id,
     column,
     order: index,
-    isHeading: false
+    fieldName: column.fieldName,
+    label: column.label,
+    type: column.type,
+    visible: column.visible,
+    width: column.width
   })) : [];
+
+  // Table columns configuration
+  const columns = [
+    {
+      title: 'Field Name',
+      render: (row: any) => (
+        <Box direction="horizontal" gap="SP2" align="center">
+          <Text>{row.column.label}</Text>
+          {row.column.fieldName === '_createdDate' && (
+            <Badge skin="neutralLight" size="small">System</Badge>
+          )}
+        </Box>
+      ),
+      width: '3fr',
+      align: 'start' as const
+    },
+    {
+      title: 'Type',
+      render: (row: any) => (
+        <Box direction="horizontal" gap="SP1" align="center">
+          {getFieldTypeIcon(row.column.type)}
+          <Text size="small" color="secondary">
+            {getFieldTypeLabel(row.column.type)}
+          </Text>
+        </Box>
+      ),
+      width: '2fr',
+      align: 'start' as const
+    },
+    {
+      title: 'Visible',
+      render: (row: any) => (
+        <Badge
+          skin={row.column.visible ? 'success' : 'neutralLight'}
+          size="small"
+        >
+          {row.column.visible ? 'Visible' : 'Hidden'}
+        </Badge>
+      ),
+      width: '1fr',
+      align: 'start' as const
+    },
+    {
+      title: 'Width',
+      render: (row: any) => (
+        <Text size="small" color="secondary">
+          {row.column.width || 'Auto'}
+        </Text>
+      ),
+      width: '1fr',
+      align: 'start' as const
+    }
+  ];
+
+  // Select all functionality
+  const allVisible = settings ? settings.columns.every(col => col.visible) : false;
+  const someVisible = settings ? settings.columns.some(col => col.visible) : false;
+  const noneVisible = settings ? !settings.columns.some(col => col.visible) : true;
+
+  const getCheckboxState = () => {
+    if (allVisible) return 'checked';
+    if (someVisible) return 'indeterminate';
+    return 'normal';
+  };
+
+  const handleSelectAll = () => {
+    if (!settings) return;
+
+    const newVisibility = !allVisible;
+
+    // Update all columns visibility
+    settings.columns.forEach(column => {
+      updateColumnVisibility(column.fieldName, newVisibility);
+    });
+
+    dashboard.showToast({
+      message: newVisibility ? 'All columns selected' : 'All columns deselected',
+      type: 'success',
+    });
+  };
 
   const handleDrop = ({ removedIndex, addedIndex }: { removedIndex: number; addedIndex: number }) => {
     if (!settings) return;
@@ -128,13 +215,18 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleResetToDefaults = () => {
-    resetToDefaults();
-    setIsResetModalOpen(false);
+    if (selectedFormId && selectedForm) {
+      console.log('SettingsPage: Reset to Defaults button clicked - executing reset');
+      formTableSettingsStore.resetFormToDefaults(selectedFormId, selectedForm.fields);
+      console.log('SettingsPage: Reset completed, visible columns:', formTableSettingsStore.getVisibleColumns(selectedFormId).length);
 
-    dashboard.showToast({
-      message: 'Settings reset to defaults',
-      type: 'success',
-    });
+      dashboard.showToast({
+        message: 'Settings reset to defaults - all columns are now visible',
+        type: 'success',
+      });
+    } else {
+      console.warn('Cannot reset - no form selected');
+    }
   };
 
   const handleSaveSettings = () => {
@@ -162,7 +254,6 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleBackToDashboard = () => {
-    // Form persistence is handled by useForms hook automatically
     dashboard.navigate({
       pageId: '18fa5508-c2db-4a9f-8331-54c511277e6a'
     });
@@ -195,31 +286,34 @@ const SettingsPage: React.FC = () => {
         <TableListItem
           draggable
           showDivider
+          showSelectionBorder={false}
           checkbox
           checked={column.visible}
           onCheckboxChange={() => handleVisibilityChange(column.fieldName, !column.visible)}
           options={[
             {
               value: (
-                <Box direction="horizontal" gap="SP2" align="center">
+                <Box direction="horizontal" gap="SP2" align="left">
                   <Text>{column.label}</Text>
                   {column.fieldName === '_createdDate' && (
                     <Badge skin="neutralLight" size="small">System</Badge>
                   )}
                 </Box>
               ),
-              width: '3fr'
+              width: '3fr',
+              align: 'left'
             },
             {
               value: (
-                <Box direction="horizontal" gap="SP1" align="center">
+                <Box direction="horizontal" gap="SP1" align="left">
                   {getFieldTypeIcon(column.type)}
                   <Text size="small" color="secondary">
                     {getFieldTypeLabel(column.type)}
                   </Text>
                 </Box>
               ),
-              width: '2fr'
+              width: '2fr',
+              align: 'left'
             },
             {
               value: (
@@ -230,7 +324,8 @@ const SettingsPage: React.FC = () => {
                   {column.visible ? 'Visible' : 'Hidden'}
                 </Badge>
               ),
-              width: '1fr'
+              width: '1fr',
+              align: 'left'
             },
             {
               value: (
@@ -238,7 +333,8 @@ const SettingsPage: React.FC = () => {
                   {column.width || 'Auto'}
                 </Text>
               ),
-              width: '1fr'
+              width: '1fr',
+              align: 'left'
             }
           ]}
         />
@@ -251,6 +347,14 @@ const SettingsPage: React.FC = () => {
     // Allow dragging all items except system fields like _createdDate
     return item.column.fieldName !== '_createdDate';
   };
+
+  // Convert settings to draggable items for SortableListBase
+  const items = settings ? settings.columns.map((column, index) => ({
+    id: column.id,
+    column,
+    order: index,
+    isHeading: false
+  })) : [];
 
   if (dataLoading || settingsLoading) {
     return (
@@ -271,7 +375,6 @@ const SettingsPage: React.FC = () => {
   return (
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
       <Page minWidth={950}>
-
         <Page.Header
           title="Table Settings"
           subtitle="Configure which columns to display and their order"
@@ -286,7 +389,7 @@ const SettingsPage: React.FC = () => {
                 Back to Dashboard
               </Button>
               <Button
-                onClick={() => setIsResetModalOpen(true)}
+                onClick={handleResetToDefaults}
                 priority="secondary"
                 prefixIcon={<Icons.Refresh />}
                 disabled={!selectedForm || isNavigating}
@@ -313,39 +416,61 @@ const SettingsPage: React.FC = () => {
                 <FormSelector
                   availableForms={availableForms}
                   selectedFormId={selectedFormId}
-                  onFormSelect={setSelectedFormId} // useForms handles persistence internally
+                  onFormSelect={setSelectedFormId}
                   loading={dataLoading}
                 />
               </Card.Content>
             </Card>
 
             {selectedForm ? (
-              <Card>
-                <Card.Header
-                  title="Column Configuration"
-                  subtitle={`${visibleColumnsCount} of ${totalColumnsCount} columns visible • Drag to reorder • Uncheck to hide`}
-                />
-                <Box direction="vertical">
-                  <TableListHeader
-                    options={headerOptions}
-                    onSortChange={() => { }} // No sorting needed for settings
-                  />
+              <Card hideOverflow>
+                <Table data={tableData} columns={columns} rowVerticalPadding="medium">
+                  {/* Table Toolbar */}
+                  <TableToolbar>
+                    <TableToolbar.ItemGroup position="start">
+                      <TableToolbar.Item>
+                        <TableToolbar.Title>Column Configuration</TableToolbar.Title>
+                      </TableToolbar.Item>
+                    </TableToolbar.ItemGroup>
+                    <TableToolbar.ItemGroup position="end">
+                      <TableToolbar.Item>
+                        <Text size="small" color="secondary">
+                          {visibleColumnsCount} of {totalColumnsCount} columns visible
+                        </Text>
+                      </TableToolbar.Item>
+                    </TableToolbar.ItemGroup>
+                  </TableToolbar>
 
-                  {items.length > 0 ? (
-                    <SortableListBase
-                      items={items}
-                      renderItem={renderItem}
-                      onDrop={handleDrop}
-                      canDrag={canDrag}
-                    />
-                  ) : (
-                    <Box padding="40px" textAlign="center">
-                      <Text size="medium" color="secondary">
-                        No fields available for this form
-                      </Text>
-                    </Box>
-                  )}
-                </Box>
+                  {/* Sticky Header with Select All */}
+                  <Page.Sticky>
+                    <Card>
+                      <TableListHeader
+                        options={headerOptions}
+                        checkboxState={getCheckboxState()}
+                        onCheckboxChange={handleSelectAll}
+                        onSortChange={() => { }} // No sorting needed for settings
+                      />
+                    </Card>
+                  </Page.Sticky>
+
+                  {/* Table Content using SortableListBase for drag and drop */}
+                  <Card>
+                    {items.length > 0 ? (
+                      <SortableListBase
+                        items={items}
+                        renderItem={renderItem}
+                        onDrop={handleDrop}
+                        canDrag={canDrag}
+                      />
+                    ) : (
+                      <Box padding="40px" textAlign="center">
+                        <Text size="medium" color="secondary">
+                          No fields available for this form
+                        </Text>
+                      </Box>
+                    )}
+                  </Card>
+                </Table>
               </Card>
             ) : (
               <Box
@@ -399,11 +524,26 @@ const SettingsPage: React.FC = () => {
                         size="small"
                         priority="secondary"
                         onClick={() => {
+                          if (selectedFormId && selectedForm) {
+                            console.log('Debug: Testing reset function directly');
+                            formTableSettingsStore.resetFormToDefaults(selectedFormId, selectedForm.fields);
+                            console.log('Debug: Reset called, current visible columns:', formTableSettingsStore.getVisibleColumns(selectedFormId).length);
+                          }
+                        }}
+                      >
+                        Test Reset (Debug)
+                      </Button>
+                      <Button
+                        size="small"
+                        priority="secondary"
+                        onClick={() => {
                           if (typeof window !== 'undefined') {
                             delete window.wixFormDashboardSettings;
                             delete window.wixFormDashboardSettingsBackup;
                             delete window.wixCurrentFormId;
-                            console.log('Debug: Cleared all storage');
+                            sessionStorage.removeItem('wixFormDashboardSettings');
+                            sessionStorage.removeItem('wixCurrentFormId');
+                            console.log('Debug: Cleared all storage including sessionStorage');
                           }
                         }}
                       >
@@ -457,32 +597,6 @@ const SettingsPage: React.FC = () => {
             )}
           </Box>
         </Page.Content>
-
-        {/* Reset Confirmation Modal */}
-        <Modal
-          isOpen={isResetModalOpen}
-          onRequestClose={() => setIsResetModalOpen(false)}
-          shouldCloseOnOverlayClick={true}
-          screen="desktop"
-        >
-          <MessageModalLayout
-            theme="standard"
-            onCloseButtonClick={() => setIsResetModalOpen(false)}
-            primaryButtonText="Reset"
-            secondaryButtonText="Cancel"
-            primaryButtonOnClick={handleResetToDefaults}
-            secondaryButtonOnClick={() => setIsResetModalOpen(false)}
-            title="Reset Table Settings"
-            content={
-              <Text>
-                This will reset all column visibility and order settings to their defaults.
-                All columns will become visible and revert to their original order.
-                <br /><br />
-                This action cannot be undone.
-              </Text>
-            }
-          />
-        </Modal>
       </Page>
     </WixDesignSystemProvider>
   );
@@ -537,5 +651,4 @@ function getFieldTypeLabel(type: FieldType): string {
   }
 }
 
-
-export default withFormTableSettings(SettingsPage);
+export default observer(SettingsPage);

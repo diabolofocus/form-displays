@@ -240,13 +240,13 @@ export class FormTableSettingsStore {
             width: '110px'
         };
 
-        // Add form fields with default visibility - show first 5 fields by default
+        // Add form fields with default visibility - show all fields by default
         const fieldColumns: ColumnSetting[] = formFields.map((field, index) => ({
             id: field.name,
             fieldName: field.name,
             label: field.label,
             type: field.type,
-            visible: index < 5, // Only show first 5 fields by default
+            visible: true, // Show all fields by default
             order: index + 1,
             width: this.getDefaultColumnWidth(field)
         }));
@@ -260,7 +260,8 @@ export class FormTableSettingsStore {
         console.log('FormTableSettingsStore: Created default settings:', {
             formId: defaultSettings.formId,
             totalColumns: defaultSettings.columns.length,
-            visibleColumns: defaultSettings.columns.filter(c => c.visible).length
+            visibleColumns: defaultSettings.columns.filter(c => c.visible).length,
+            note: 'All columns visible by default'
         });
 
         return defaultSettings;
@@ -390,13 +391,30 @@ export class FormTableSettingsStore {
 
     // Reset settings for a form
     resetFormToDefaults(formId: string, formFields: FormField[]) {
-        if (!formId || !formFields.length) return;
+        if (!formId || !formFields.length) {
+            console.warn('FormTableSettingsStore: Cannot reset - invalid formId or formFields');
+            return;
+        }
+
+        console.log('FormTableSettingsStore: Starting reset to defaults for form:', formId);
 
         runInAction(() => {
+            // Delete existing settings first to ensure clean reset
+            if (this.settings.formSettings[formId]) {
+                delete this.settings.formSettings[formId];
+                console.log('FormTableSettingsStore: Cleared existing settings for form:', formId);
+            }
+
+            // Create fresh default settings
             const defaultSettings = this.createDefaultSettings(formId, formFields);
             this.settings.formSettings[formId] = defaultSettings;
+
+            console.log('FormTableSettingsStore: Created new default settings with', defaultSettings.columns.filter(c => c.visible).length, '/', defaultSettings.columns.length, 'visible columns');
+
+            // Save immediately
             this.saveSettings();
-            console.log('FormTableSettingsStore: Reset form settings to defaults:', formId);
+
+            console.log('FormTableSettingsStore: Reset complete for form:', formId);
         });
     }
 
