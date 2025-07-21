@@ -638,31 +638,30 @@ function renderValueByType(value: any, field: FormField): React.ReactNode {
         }
 
         // Regular array handling for non-media arrays
-        if (value.length > 5) {
-            // Create tooltip content with all items
-            const tooltipContent = value.map((item, index) =>
-                `${index + 1}. ${String(item)}`
-            ).join('\n');
-
-            return (
-                <Tooltip content={tooltipContent} placement="top">
-                    <Badge skin="neutralLight" size="small">
-                        {value.length} items
-                    </Badge>
-                </Tooltip>
-            );
-        }
-
-        const tagData = value.slice(0, 4).map((item, index) => ({
+        const tagData = value.map((item, index) => ({
             id: `tag-${index}`,
-            children: String(item).substring(0, 25)
+            children: String(item).substring(0, 25),
+            removable: false
         }));
+
+        const maxVisibleTags = 4;
 
         return (
             <TagList
                 tags={tagData}
                 size="small"
-                maxVisibleTags={4}
+                maxVisibleTags={maxVisibleTags}
+                toggleMoreButton={
+                    value.length > maxVisibleTags
+                        ? (amountOfHiddenTags, isExpanded) => ({
+                            label: isExpanded ? 'Show Less' : `+${amountOfHiddenTags} More`,
+                            tooltipContent: !isExpanded ? 'Show More' : 'Show Less',
+                            skin: 'standard' as const,
+                            priority: 'secondary' as const,
+                        })
+                        : undefined
+                }
+                onTagRemove={() => { }} // Required prop but won't be used since removable: false
             />
         );
     }
