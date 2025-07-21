@@ -248,7 +248,6 @@ export const PatientTable: React.FC<PatientTableProps> = ({
     .actions-column {
         position: sticky !important;
         right: 20px !important;
-
         z-index: 1 !important;
     }
     
@@ -257,7 +256,6 @@ export const PatientTable: React.FC<PatientTableProps> = ({
         position: sticky;
         top: 0;
         z-index: 2;
-        background: white;
     }
 
     /* Add this to your existing styles */

@@ -17,7 +17,8 @@ import {
     IconButton,
     TextButton,
     TagList,
-    Table
+    Table,
+    Tooltip
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { GenericSubmission, FormField, FieldType } from '../types';
@@ -125,14 +126,6 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                 return columnSetting.width;
             }
         }
-
-        // For few columns, calculate percentage widths to fill 100%
-        if (safeVisibleColumns.length <= 4) {
-            const totalColumns = safeVisibleColumns.length + 1; // +1 for actions column
-            const columnPercentage = Math.floor((100 - 15) / safeVisibleColumns.length); // Reserve 15% for actions
-            return `${columnPercentage}%`;
-        }
-
         return getDefaultColumnWidth(field, index);
     };
 
@@ -196,16 +189,65 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         right: 0px !important;
                         z-index: 1 !important;
                     }
+
+                    /* Keep actions column background transparent on hover */
+                    [data-hook="table-cell"]:last-child {
+                        background-color: transparent !important;
+                    }
+                    
+                    [data-hook="table-cell"]:last-child:hover {
+                        background-color: transparent !important;
+                    }
+                    
+                    /* More specific selector for Wix Table actions column */
+                    table tbody tr td:last-child {
+                        background-color: transparent !important;
+                    }
+                    
+                    table tbody tr:hover td:last-child {
+                        background-color: transparent !important;
+                    }
+
+                    /* Custom scrollbar for media gallery tooltip */
+                    .media-gallery-tooltip::-webkit-scrollbar {
+                        height: 6px;
+                    }
+                    
+                    .media-gallery-tooltip::-webkit-scrollbar-track {
+                        background: #f1f1f1;
+                        border-radius: 3px;
+                    }
+                    
+                    .media-gallery-tooltip::-webkit-scrollbar-thumb {
+                        background: #c1c1c1;
+                        border-radius: 3px;
+                    }
+                    
+                    .media-gallery-tooltip::-webkit-scrollbar-thumb:hover {
+                        background: #a8a8a8;
+                    }
+
+                    /* Force tooltip to be wider */
+                    [data-hook="tooltip-content"] {
+                        max-width: none !important;
+                        min-width: 300px !important;
+                        width: auto !important;
+                    }
+
+                    /* Override Wix tooltip wrapper constraints */
+                    [role="tooltip"] {
+                        max-width: 485px !important;
+                    }
+                
                 `}</style>
 
                 <Table
-                    horizontalScroll={safeVisibleColumns.length > 6} // Use horizontal scroll when more than 6 columns
+                    horizontalScroll={safeVisibleColumns.length > 4} // Only use horizontal scroll when many columns
                     data={currentSubmissions.map((submission, index) => ({
                         ...submission,
                         _index: index,
                         _submissionData: submission
                     }))}
-                    onRowClick={(row) => onViewSubmission(row._submissionData)}
                     columns={[
                         ...safeVisibleColumns.map((field, index) => ({
                             title: field.name === '_createdDate' || field.name === '_updatedDate' ? (
@@ -281,7 +323,6 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                     </PopoverMenu>
                                 </div>
                             ),
-                            width: safeVisibleColumns.length <= 4 ? '100px' : '100px', // Keep fixed width for actions
                             align: 'end' as const,
                             stickyActionCell: safeVisibleColumns.length > 4 // Only sticky when many columns
                         }
@@ -292,18 +333,11 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                             <TableToolbar.Item>
                                 <Text size="medium" weight="normal">
                                     {filteredSubmissions.length !== totalSubmissions
-                                        ? `${filteredSubmissions.length} of ${totalSubmissions} submissions`
-                                        : `${totalSubmissions} submissions`
+                                        ? `${filteredSubmissions.length} of ${totalSubmissions} Submissions`
+                                        : `${totalSubmissions} Submissions`
                                     }
                                 </Text>
                             </TableToolbar.Item>
-                            {safeVisibleColumns.length > 6 && (
-                                <TableToolbar.Item>
-                                    <Text size="small" color="secondary">
-                                        {safeVisibleColumns.length} columns • Scroll horizontally for more →
-                                    </Text>
-                                </TableToolbar.Item>
-                            )}
                             <TableToolbar.Item>
                                 {(() => {
                                     // Count total possible columns (form fields + system fields)
@@ -384,7 +418,7 @@ function getDefaultColumnWidth(field: FormField, index: number): string {
     // PRIORITY 1: Field Type-based widths
     switch (field.type) {
         case FieldType.EMAIL:
-            return '400px';
+            return '300px';
         case FieldType.PHONE:
             return '260px';
         case FieldType.DATE:
@@ -486,11 +520,136 @@ function renderValueByType(value: any, field: FormField): React.ReactNode {
             return <Text size="small" color="disabled">Empty array</Text>;
         }
 
-        if (value.length > 4) {
-            return (
-                <Box direction="horizontal" gap="SP1" align="center">
-                    <Badge skin="neutralLight" size="small">{value.length} items</Badge>
+        // Check if this is a media gallery (array of objects with url/filename)
+        const isMediaGallery = value.some(item =>
+            typeof item === 'object' &&
+            item !== null &&
+            (item.url || item.filename || item.name)
+        );
+
+        if (isMediaGallery) {
+            // Show first 3 media items horizontally, then count if more
+            const mediaItems = value.slice(0, 3);
+            const remainingCount = Math.max(0, value.length - 3);
+
+            const tooltipContent = (
+                <Box
+                    direction="horizontal"
+                    gap="SP2"
+                    padding="12px"
+                    className="media-gallery-tooltip"
+                    style={{
+                        minWidth: '600px',
+                        overflowX: 'auto',
+                        scrollBehavior: 'smooth'
+                    }}
+                >
+                    {value.map((item, index) => {
+                        const imageUrl = item.url || item.src;
+                        const fileName = item.filename || item.name || `File ${index + 1}`;
+
+                        return (
+                            <Box key={index} direction="vertical" gap="SP1" align="center">
+                                {imageUrl && isImageUrl(imageUrl) ? (
+                                    <img
+                                        src={imageUrl}
+                                        alt={fileName}
+                                        style={{
+                                            width: '200px',
+                                            height: '200px',
+                                            objectFit: 'cover',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e0e0e0',
+                                            flexShrink: 0
+                                        }}
+                                        onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                        }}
+                                    />
+                                ) : (
+                                    <Box
+                                        width="200px"
+                                        height="200px"
+                                        backgroundColor="neutralLight"
+                                        borderRadius="8px"
+                                        align="center"
+                                        verticalAlign="middle"
+                                        style={{ flexShrink: 0 }}
+                                    >
+                                        <Icons.Document size="64px" />
+                                    </Box>
+                                )}
+                                <Text size="tiny" ellipsis style={{ maxWidth: '200px', textAlign: 'center' }}>
+                                    {fileName}
+                                </Text>
+                            </Box>
+                        );
+                    })}
                 </Box>
+            );
+
+            return (
+                <Tooltip content={tooltipContent} placement="top" size="medium">
+                    <Box direction="horizontal" gap="SP1" align="center" style={{ cursor: 'pointer' }}>
+                        {mediaItems.map((item, index) => {
+                            const imageUrl = item.url || item.src;
+                            const fileName = item.filename || item.name || `File ${index + 1}`;
+
+                            return (
+                                <Box key={index}>
+                                    {imageUrl && isImageUrl(imageUrl) ? (
+                                        <img
+                                            src={imageUrl}
+                                            alt={fileName}
+                                            style={{
+                                                width: '36px',
+                                                height: '36px',
+                                                objectFit: 'cover',
+                                                borderRadius: '4px',
+                                                border: '1px solid #e0e0e0'
+                                            }}
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                            }}
+                                        />
+                                    ) : (
+                                        <Box
+                                            width="36px"
+                                            height="36px"
+                                            backgroundColor="neutralLight"
+                                            borderRadius="4px"
+                                            align="center"
+                                            verticalAlign="middle"
+                                        >
+                                            <Icons.Document size="16px" />
+                                        </Box>
+                                    )}
+                                </Box>
+                            );
+                        })}
+                        {remainingCount > 0 && (
+                            <Badge skin="neutralLight" size="small">
+                                +{remainingCount}
+                            </Badge>
+                        )}
+                    </Box>
+                </Tooltip>
+            );
+        }
+
+        // Regular array handling for non-media arrays
+        if (value.length > 5) {
+            // Create tooltip content with all items
+            const tooltipContent = value.map((item, index) =>
+                `${index + 1}. ${String(item)}`
+            ).join('\n');
+
+            return (
+                <Tooltip content={tooltipContent} placement="top">
+                    <Badge skin="neutralLight" size="small">
+                        {value.length} items
+                    </Badge>
+                </Tooltip>
             );
         }
 

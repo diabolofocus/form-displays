@@ -336,7 +336,7 @@ export class FormTableSettingsStore {
         // PRIORITY 1: Field Type-based widths
         switch (field.type) {
             case FieldType.EMAIL:
-                return '400px';
+                return '300px';
             case FieldType.PHONE:
                 return '260px';
             case FieldType.DATE:
@@ -366,8 +366,7 @@ export class FormTableSettingsStore {
         // PRIORITY 2: Field Name Pattern-based widths (only for TEXT and unknown types)
         if (fieldName.includes('name') || fieldName.includes('vorname')) return '280px';
         if (fieldName.includes('address') || fieldName.includes('adresse')) return '360px';
-        if (fieldName.includes('geschlecht') || fieldName.includes('gender')) return '160px';
-        if (fieldName.includes('description') || fieldName.includes('beschreibung')) return '400px';
+        if (fieldName.includes('description')) return '400px';
         if (fieldName.includes('id') || fieldName.includes('guid')) return '200px';
 
         return '260px';
