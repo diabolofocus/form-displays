@@ -71,6 +71,14 @@ export const useFormTableSettings = (formId: string | null, formFields: FormFiel
                 console.warn('useFormTableSettings: Cannot reset - missing formId or formFields');
             }
         },
+        updateColumnWidth: (fieldName: string, width: string) => {
+            if (formId) {
+                console.log('useFormTableSettings: Updating width:', fieldName, width);
+                formTableSettingsStore.updateColumnWidth(formId, fieldName, width);
+                // Force re-render
+                setForceRefresh(prev => prev + 1);
+            }
+        },
         saveSettingsExplicitly: () => {
             console.log('useFormTableSettings: Explicit save called');
             formTableSettingsStore.saveSettings();

@@ -369,6 +369,30 @@ export class FormTableSettingsStore {
         });
     }
 
+    updateColumnWidth(formId: string, fieldName: string, width: string) {
+        if (!formId || !this.settings.formSettings[formId]) {
+            console.warn('FormTableSettingsStore: Cannot update width - no settings for form:', formId);
+            return;
+        }
+
+        runInAction(() => {
+            const formSettings = this.settings.formSettings[formId];
+            const updatedColumns = formSettings.columns.map(col =>
+                col.fieldName === fieldName ? { ...col, width: width || undefined } : col
+            );
+
+            this.settings.formSettings[formId] = {
+                ...formSettings,
+                columns: updatedColumns,
+                lastUpdated: new Date().toISOString()
+            };
+
+            // Force save the settings
+            this.saveSettings();
+            console.log('FormTableSettingsStore: Updated width for', fieldName, ':', width);
+        });
+    }
+
     // Get visible columns for a form
     getVisibleColumns(formId: string): FormField[] {
         if (!formId) return [];

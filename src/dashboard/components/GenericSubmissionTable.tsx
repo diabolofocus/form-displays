@@ -25,7 +25,8 @@ import { formatToGermanDate } from '../utils/helpers';
 interface GenericSubmissionTableProps {
     submissions: GenericSubmission[];
     formFields: FormField[];
-    visibleColumns: FormField[]; // Add this prop
+    visibleColumns: FormField[];
+    columnSettings?: any[]; // Add column settings with width info
     formId: string | null;
     onViewSubmission: (submission: GenericSubmission) => void;
     onPrintSubmission: (submission: GenericSubmission) => void;
@@ -42,6 +43,7 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     submissions,
     formFields,
     visibleColumns, // Use this instead of calculating internally
+    columnSettings,
     formId,
     onViewSubmission,
     onPrintSubmission,
@@ -114,8 +116,14 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
         }
     };
 
-    // Get column width - just use default since we don't have settings here
+    // Get column width from settings or use default
     const getColumnWidth = (field: FormField, index: number): string => {
+        if (columnSettings) {
+            const columnSetting = columnSettings.find(col => col.fieldName === field.name);
+            if (columnSetting && columnSetting.width) {
+                return columnSetting.width;
+            }
+        }
         return getDefaultColumnWidth(field, index);
     };
 

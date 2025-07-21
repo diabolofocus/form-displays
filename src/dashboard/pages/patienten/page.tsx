@@ -393,6 +393,7 @@ const GenericFormDashboard: React.FC = () => {
                 submissions={selectedFormSubmissions}
                 formFields={selectedForm.fields}
                 visibleColumns={visibleColumns}
+                columnSettings={tableSettings?.columns || []}
                 formId={selectedFormId}
                 onViewSubmission={handleViewSubmission}
                 onPrintSubmission={handlePrintSubmission}

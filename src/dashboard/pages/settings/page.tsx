@@ -18,7 +18,8 @@ import {
   Modal,
   Loader,
   Badge,
-  WixDesignSystemProvider
+  WixDesignSystemProvider,
+  Input
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
@@ -47,6 +48,7 @@ const SettingsPage: React.FC = () => {
     isLoading: settingsLoading,
     updateColumnVisibility,
     updateColumnOrder,
+    updateColumnWidth,
     resetToDefaults,
     saveSettingsExplicitly
   } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
@@ -154,11 +156,24 @@ const SettingsPage: React.FC = () => {
     {
       title: 'Width',
       render: (row: any) => (
-        <Text size="small" color="secondary">
-          {row.column.width || 'Auto'}
-        </Text>
+        <Box width="80px">
+          <Input
+            size="small"
+            value={row.column.width || ''}
+            placeholder="Auto"
+            onChange={(e) => updateColumnWidth(row.column.fieldName, e.target.value)}
+            onBlur={(e) => {
+              // Validate and format the input
+              const value = e.target.value.trim();
+              if (value && !value.match(/^\d+(px|%|fr|em|rem)?$/)) {
+                // If invalid format, revert to previous value
+                updateColumnWidth(row.column.fieldName, row.column.width || '');
+              }
+            }}
+          />
+        </Box>
       ),
-      width: '1fr',
+      width: '120px',
       align: 'start' as const
     }
   ];
@@ -329,11 +344,24 @@ const SettingsPage: React.FC = () => {
             },
             {
               value: (
-                <Text size="small" color="secondary">
-                  {column.width || 'Auto'}
-                </Text>
+                <Box width="80px">
+                  <Input
+                    size="small"
+                    value={column.width || ''}
+                    placeholder="Auto"
+                    onChange={(e) => updateColumnWidth(column.fieldName, e.target.value)}
+                    onBlur={(e) => {
+                      // Validate and format the input
+                      const value = e.target.value.trim();
+                      if (value && !value.match(/^\d+(px|%|fr|em|rem)?$/)) {
+                        // If invalid format, revert to previous value
+                        updateColumnWidth(column.fieldName, column.width || '');
+                      }
+                    }}
+                  />
+                </Box>
               ),
-              width: '1fr',
+              width: '120px',
               align: 'left'
             }
           ]}
@@ -409,10 +437,11 @@ const SettingsPage: React.FC = () => {
         />
 
         <Page.Content>
-          <Box direction="vertical" gap="SP4">
+          <Box direction="vertical" backgroundColor="red" align="center" gap="SP4">
             {/* Form Selector */}
             <Card>
               <Card.Content>
+
                 <FormSelector
                   availableForms={availableForms}
                   selectedFormId={selectedFormId}
