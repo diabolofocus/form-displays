@@ -21,11 +21,11 @@ import {
 import * as Icons from '@wix/wix-ui-icons-common';
 import { GenericSubmission, FormField, FieldType } from '../types';
 import { formatToGermanDate } from '../utils/helpers';
-import { useSettings } from '../hooks/useSettings';
 
 interface GenericSubmissionTableProps {
     submissions: GenericSubmission[];
     formFields: FormField[];
+    visibleColumns: FormField[]; // Add this prop
     formId: string | null;
     onViewSubmission: (submission: GenericSubmission) => void;
     onPrintSubmission: (submission: GenericSubmission) => void;
@@ -41,6 +41,7 @@ const ITEMS_PER_PAGE = 40;
 export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     submissions,
     formFields,
+    visibleColumns, // Use this instead of calculating internally
     formId,
     onViewSubmission,
     onPrintSubmission,
@@ -54,33 +55,12 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     const [sortField, setSortField] = useState<string>('_createdDate');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-    // Use settings to get visible columns - now returns memoized visibleColumns directly
-    const { visibleColumns, settings, isLoading: settingsLoading } = useSettings(formId, formFields);
+    // Simply use the passed visibleColumns
+    const safeVisibleColumns = visibleColumns;
 
-    // CRITICAL: Ensure we only use settings that match the current form
-    const safeVisibleColumns = useMemo(() => {
-        if (!formId) {
-            console.log('GenericSubmissionTable: No formId, using all fields');
-            return formFields;
-        }
-
-        if (settings && settings.formId !== formId) {
-            console.log('GenericSubmissionTable: Settings form mismatch!', {
-                settingsFormId: settings.formId,
-                currentFormId: formId
-            });
-            return formFields; // Use all fields if settings don't match
-        }
-
-        console.log('GenericSubmissionTable: Using visible columns for form', formId, ':', visibleColumns.length);
-        return visibleColumns;
-    }, [visibleColumns, settings, formId, formFields]);
-
-    // Log when safeVisibleColumns change for debugging
     useEffect(() => {
-        console.log('GenericSubmissionTable: safeVisibleColumns changed:', safeVisibleColumns.length);
-        console.log('GenericSubmissionTable: settings:', settings ? { formId: settings.formId, valid: settings.formId === formId } : null);
-    }, [safeVisibleColumns, settings, formId]);
+        // Removed console logging to reduce noise
+    }, [safeVisibleColumns]);
 
     // Filter submissions based on search term
     const filteredSubmissions = submissions.filter(submission => {
@@ -134,43 +114,12 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
         }
     };
 
-    // Get column width from settings or use default
+    // Get column width - just use default since we don't have settings here
     const getColumnWidth = (field: FormField, index: number): string => {
-        if (settings && settings.formId === formId) {
-            const columnSetting = settings.columns.find(col => col.fieldName === field.name);
-            if (columnSetting?.width) {
-                return columnSetting.width;
-            }
-        }
-
-        // Fallback to default widths
         return getDefaultColumnWidth(field, index);
     };
 
     const hasNoSubmissions = submissions.length === 0;
-
-    // Show loading state while settings are loading OR if settings don't match current form
-    if (settingsLoading) {
-        return (
-            <Box direction="vertical" gap="SP4">
-                <Card>
-                    <Box padding="40px" textAlign="center">
-                        <Text>Loading table settings...</Text>
-                    </Box>
-                </Card>
-            </Box>
-        );
-    }
-
-    // Show warning if settings don't match current form
-    if (settings && formId && settings.formId !== formId) {
-        console.warn('GenericSubmissionTable: Settings form mismatch detected!', {
-            settingsFormId: settings.formId,
-            currentFormId: formId,
-            usingFallback: true
-        });
-    }
-
     return (
         <Box direction="vertical" gap="SP4">
             <Box
@@ -262,13 +211,11 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                     </Text>
                                 </TableToolbar.Item>
                             )}
-                            {settings && settings.formId === formId && (
-                                <TableToolbar.Item>
-                                    <Badge skin="neutralLight" size="small">
-                                        {safeVisibleColumns.length} of {settings.columns.length} columns shown
-                                    </Badge>
-                                </TableToolbar.Item>
-                            )}
+                            <TableToolbar.Item>
+                                <Badge skin="neutralLight" size="small">
+                                    {safeVisibleColumns.length} of {formFields.length} columns shown
+                                </Badge>
+                            </TableToolbar.Item>
                         </TableToolbar.ItemGroup>
                         <TableToolbar.ItemGroup position="end">
                             <TableToolbar.Item>

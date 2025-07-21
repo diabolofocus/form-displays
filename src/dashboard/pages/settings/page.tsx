@@ -21,11 +21,13 @@ import {
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
-import { useSettings, ColumnSetting } from '../../hooks/useSettings';
+import { useFormTableSettings, withFormTableSettings, } from '../../hooks/useFormTableSettings';
+import { ColumnSetting } from '../stores/FormTableSettingsStore';
 import { useForms } from '../../hooks/useForms';
 import { usePatientData } from '../../hooks/usePatientData';
 import { FormSelector } from '../../components/FormSelector';
 import { FieldType } from '../../types';
+
 
 import '@wix/design-system/styles.global.css';
 
@@ -44,9 +46,9 @@ const SettingsPage: React.FC = () => {
     updateColumnVisibility,
     updateColumnOrder,
     resetToDefaults,
-    visibleColumns,
     saveSettingsExplicitly
-  } = useSettings(selectedFormId, selectedForm?.fields || []);
+  } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
+
 
   // Debug logging for settings page
   useEffect(() => {
@@ -59,6 +61,14 @@ const SettingsPage: React.FC = () => {
       settingsFormId: settings?.formId
     });
   }, [selectedFormId, selectedForm, availableForms.length, settings]);
+
+  useEffect(() => {
+    console.log('SettingsPage: Settings changed:', {
+      formId: settings?.formId,
+      totalColumns: settings?.columns.length,
+      visibleColumns: settings?.columns.filter((c: any) => c.visible).length
+    });
+  }, [settings]);
 
   // Form selection is now handled by useForms hook
 
@@ -178,7 +188,7 @@ const SettingsPage: React.FC = () => {
       );
     }
 
-    const column: ColumnSetting = item.column;
+    const column: any = item.column;
 
     return (
       <div>
@@ -527,4 +537,5 @@ function getFieldTypeLabel(type: FieldType): string {
   }
 }
 
-export default SettingsPage;
+
+export default withFormTableSettings(SettingsPage);

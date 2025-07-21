@@ -4,6 +4,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { GenericSubmission, FormInfo, FormField, FieldType } from '../types';
+import { formTableSettingsStore } from '../pages/stores/FormTableSettingsStore';
+
 
 export const useForms = (allSubmissions: GenericSubmission[]) => {
     const [selectedFormId, setSelectedFormIdState] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export const useForms = (allSubmissions: GenericSubmission[]) => {
             console.log('useForms: Stored form ID in window IMMEDIATELY:', formId);
         }
 
+        // Also update the store
+        formTableSettingsStore.setSelectedFormId(formId);
         setSelectedFormIdState(formId);
     };
 
@@ -84,6 +88,8 @@ export const useForms = (allSubmissions: GenericSubmission[]) => {
             if (formExists && storedFormId !== selectedFormId) {
                 console.log('useForms: Restoring form selection from storage:', storedFormId);
                 setSelectedFormIdState(storedFormId);
+                // Also update the store immediately
+                formTableSettingsStore.setSelectedFormId(storedFormId);
                 return;
             }
         }

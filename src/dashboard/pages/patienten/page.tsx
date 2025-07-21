@@ -28,11 +28,17 @@ import { PatientDetailsModal } from '../../components/PatientDetailsModal';
 import { printPatientDetails } from '../../utils/printUtils';
 import { submissions } from '@wix/forms';
 import { GenericSubmission, PatientSubmission } from '../../types';
+import { useFormTableSettings, withFormTableSettings } from '../../hooks/useFormTableSettings';
+import { formTableSettingsStore } from '../stores/FormTableSettingsStore';
+
+
+
 
 declare global {
   interface Window {
     wixFormDashboardSettings?: import('../../hooks/useSettings').FormSettings[];
     wixCurrentFormId?: string;
+    wixFormStoreInitialized?: boolean;
   }
 }
 
@@ -67,8 +73,11 @@ const GenericFormDashboard: React.FC = () => {
     selectedFormSubmissions
   } = useForms(allSubmissions);
 
-  // Let useForms handle form selection - remove duplication
-  // The useForms hook now handles all form selection logic
+  const {
+    settings: tableSettings,
+    visibleColumns,
+    isLoading: settingsLoading
+  } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
 
   // Debug logging to ensure form ID is being passed correctly
   useEffect(() => {
@@ -383,6 +392,7 @@ const GenericFormDashboard: React.FC = () => {
                 key={selectedFormId} // Force re-render when form changes
                 submissions={selectedFormSubmissions}
                 formFields={selectedForm.fields}
+                visibleColumns={visibleColumns}
                 formId={selectedFormId}
                 onViewSubmission={handleViewSubmission}
                 onPrintSubmission={handlePrintSubmission}
@@ -499,4 +509,4 @@ const GenericFormDashboard: React.FC = () => {
   );
 };
 
-export default GenericFormDashboard;
+export default withFormTableSettings(GenericFormDashboard);
