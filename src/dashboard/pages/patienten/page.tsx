@@ -29,7 +29,6 @@ import { printPatientDetails } from '../../utils/printUtils';
 import { submissions } from '@wix/forms';
 import { GenericSubmission, PatientSubmission } from '../../types';
 import { useFormTableSettings, withFormTableSettings } from '../../hooks/useFormTableSettings';
-import { formTableSettingsStore } from '../stores/FormTableSettingsStore';
 
 
 
@@ -75,8 +74,7 @@ const GenericFormDashboard: React.FC = () => {
 
   const {
     settings: tableSettings,
-    visibleColumns,
-    isLoading: settingsLoading
+    visibleColumns
   } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
 
   // Debug logging to ensure form ID is being passed correctly
@@ -282,8 +280,7 @@ const GenericFormDashboard: React.FC = () => {
                 availableForms={availableForms}
                 selectedFormId={selectedFormId}
                 onFormSelect={setSelectedFormId} // useForms handles persistence internally
-                loading={loading}
-              />
+                loading={loading} />
               <Box>
                 <TextButton
                   prefixIcon={<Icons.Hint size="20px" />}

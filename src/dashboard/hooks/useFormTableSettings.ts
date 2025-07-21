@@ -83,6 +83,12 @@ export const useFormTableSettings = (formId: string | null, formFields: FormFiel
             console.log('useFormTableSettings: Explicit save called');
             formTableSettingsStore.saveSettings();
             return true;
+        },
+        updateFormName: (formId: string, customName: string) => {
+            console.log('useFormTableSettings: Updating form name:', formId, customName);
+            formTableSettingsStore.updateFormName(formId, customName);
+            // Force re-render
+            setForceRefresh(prev => prev + 1);
         }
     };
 };

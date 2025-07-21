@@ -7,6 +7,7 @@ import { GenericSubmission, FormInfo, FormField, FieldType } from '../types';
 import { formTableSettingsStore } from '../pages/stores/FormTableSettingsStore';
 
 
+
 export const useForms = (allSubmissions: GenericSubmission[]) => {
     const [selectedFormId, setSelectedFormIdState] = useState<string | null>(null);
     const [hasInitialized, setHasInitialized] = useState(false);
@@ -38,8 +39,8 @@ export const useForms = (allSubmissions: GenericSubmission[]) => {
             }
         });
 
-        return Array.from(formsMap.values()).map(formData =>
-            analyzeFormStructure(formData.formId, formData.submissions, formData.lastSubmissionDate)
+        return Array.from(formsMap.values()).map((formData, index) =>
+            analyzeFormStructure(formData.formId, formData.submissions, formData.lastSubmissionDate, index)
         ).sort((a, b) => new Date(b.lastSubmissionDate!).getTime() - new Date(a.lastSubmissionDate!).getTime());
     }, [allSubmissions]);
 
@@ -135,17 +136,25 @@ export const useForms = (allSubmissions: GenericSubmission[]) => {
         });
     }, [selectedFormId, availableForms.length, selectedFormSubmissions.length]);
 
+    // Apply custom names from the store
+    const availableFormsWithCustomNames = useMemo(() => {
+        return availableForms.map(form => ({
+            ...form,
+            name: formTableSettingsStore.getCustomFormName(form.formId) || form.name
+        }));
+    }, [availableForms]);
+
     return {
-        availableForms,
+        availableForms: availableFormsWithCustomNames,
         selectedFormId,
         setSelectedFormId,
-        selectedForm,
+        selectedForm: availableFormsWithCustomNames.find(f => f.formId === selectedFormId) || null,
         selectedFormSubmissions
     };
 };
 
 // Rest of the functions remain the same...
-function analyzeFormStructure(formId: string, submissions: GenericSubmission[], lastSubmissionDate: string): FormInfo {
+function analyzeFormStructure(formId: string, submissions: GenericSubmission[], lastSubmissionDate: string, formIndex: number = 0): FormInfo {
     const fieldMap = new Map<string, {
         name: string;
         values: any[];
@@ -194,7 +203,7 @@ function analyzeFormStructure(formId: string, submissions: GenericSubmission[], 
 
     return {
         formId,
-        name: generateFormName(formId, fields),
+        name: generateFormName(formId, fields, formIndex),
         submissionCount: submissions.length,
         fields,
         lastSubmissionDate
@@ -316,25 +325,7 @@ function getSelectOptions(values: any[]): string[] {
     return uniqueValues;
 }
 
-// Generate form name based on formId and fields
-function generateFormName(formId: string, fields: FormField[]): string {
-    // Try to find a descriptive field that might indicate form purpose
-    const nameFields = fields.filter(field =>
-        field.name.toLowerCase().includes('title') ||
-        field.name.toLowerCase().includes('name') ||
-        field.name.toLowerCase().includes('bezeichnung')
-    );
-
-    if (nameFields.length > 0) {
-        const titleField = nameFields[0];
-        if (titleField.sampleValues && titleField.sampleValues.length > 0) {
-            const sampleTitle = titleField.sampleValues[0];
-            if (typeof sampleTitle === 'string' && sampleTitle.length < 50) {
-                return `${sampleTitle} (${formId.slice(0, 8)})`;
-            }
-        }
-    }
-
-    // Fallback: use formId with field count
-    return `Form ${formId.slice(0, 8)} (${fields.length} fields)`;
+// Generate simple form name with incrementing number
+function generateFormName(formId: string, fields: FormField[], formIndex: number): string {
+    return `Form ${formIndex + 1}`;
 }

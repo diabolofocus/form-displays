@@ -17,6 +17,7 @@ export interface ColumnSetting {
 
 export interface FormSettings {
     formId: string;
+    customName?: string;
     columns: ColumnSetting[];
     lastUpdated: string;
 }
@@ -464,18 +465,29 @@ export class FormTableSettingsStore {
         });
     }
 
-    // Update entire form settings
-    updateFormSettings(formId: string, updatedSettings: FormSettings) {
+    // Update custom form name
+    updateFormName(formId: string, customName: string) {
         if (!formId) {
-            console.warn('FormTableSettingsStore: Cannot update settings - no formId');
+            console.warn('FormTableSettingsStore: Cannot update name - no formId');
             return;
         }
 
         runInAction(() => {
-            this.settings.formSettings[formId] = updatedSettings;
-            this.saveSettings();
-            console.log('FormTableSettingsStore: Updated entire form settings for:', formId);
+            if (this.settings.formSettings[formId]) {
+                this.settings.formSettings[formId] = {
+                    ...this.settings.formSettings[formId],
+                    customName: customName.trim() || undefined,
+                    lastUpdated: new Date().toISOString()
+                };
+                this.saveSettings();
+                console.log('FormTableSettingsStore: Updated form name for:', formId, 'to:', customName);
+            }
         });
+    }
+
+    // Get custom form name
+    getCustomFormName(formId: string): string | undefined {
+        return this.settings.formSettings[formId]?.customName;
     }
 
     // Utility getters

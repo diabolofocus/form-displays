@@ -24,12 +24,11 @@ import {
 import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
 import { useFormTableSettings, withFormTableSettings, } from '../../hooks/useFormTableSettings';
-import { ColumnSetting } from '../stores/FormTableSettingsStore';
+import { ColumnSetting, formTableSettingsStore } from '../stores/FormTableSettingsStore';
 import { useForms } from '../../hooks/useForms';
 import { usePatientData } from '../../hooks/usePatientData';
 import { FormSelector } from '../../components/FormSelector';
 import { FieldType } from '../../types';
-import { formTableSettingsStore } from '../stores/FormTableSettingsStore';
 
 import '@wix/design-system/styles.global.css';
 import { observer } from 'mobx-react-lite';
@@ -49,6 +48,7 @@ const SettingsPage: React.FC = () => {
     updateColumnVisibility,
     updateColumnOrder,
     updateColumnWidth,
+    updateFormName,
     resetToDefaults,
     saveSettingsExplicitly
   } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
@@ -74,6 +74,7 @@ const SettingsPage: React.FC = () => {
   }, [settings]);
 
   const [headerOptions] = useState([
+
     {
       value: 'Field Name',
       width: '3fr',
@@ -156,21 +157,31 @@ const SettingsPage: React.FC = () => {
     {
       title: 'Width',
       render: (row: any) => (
-        <Box width="80px">
-          <Input
-            size="small"
-            value={row.column.width || ''}
-            placeholder="Auto"
-            onChange={(e) => updateColumnWidth(row.column.fieldName, e.target.value)}
-            onBlur={(e) => {
-              // Validate and format the input
-              const value = e.target.value.trim();
-              if (value && !value.match(/^\d+(px|%|fr|em|rem)?$/)) {
-                // If invalid format, revert to previous value
-                updateColumnWidth(row.column.fieldName, row.column.width || '');
-              }
-            }}
-          />
+        <Box direction="horizontal" gap="SP1" align="center">
+          <Box width="60px">
+            <Input
+              size="small"
+              value={row.column.width ? row.column.width.replace('px', '') : ''}
+              placeholder="Auto"
+              onChange={(e) => {
+                const numericValue = e.target.value.trim();
+                const width = numericValue ? `${numericValue}px` : '';
+                updateColumnWidth(row.column.fieldName, width);
+              }}
+              onBlur={(e) => {
+                // Validate numeric input
+                const value = e.target.value.trim();
+                if (value && !value.match(/^\d+$/)) {
+                  // If invalid format, revert to previous value
+                  const currentWidth = row.column.width || '';
+                  updateColumnWidth(row.column.fieldName, currentWidth);
+                }
+              }}
+            />
+          </Box>
+          {row.column.width && row.column.width !== 'Auto' && (
+            <Text size="small" color="secondary">px</Text>
+          )}
         </Box>
       ),
       width: '120px',
@@ -344,21 +355,31 @@ const SettingsPage: React.FC = () => {
             },
             {
               value: (
-                <Box width="80px">
-                  <Input
-                    size="small"
-                    value={column.width || ''}
-                    placeholder="Auto"
-                    onChange={(e) => updateColumnWidth(column.fieldName, e.target.value)}
-                    onBlur={(e) => {
-                      // Validate and format the input
-                      const value = e.target.value.trim();
-                      if (value && !value.match(/^\d+(px|%|fr|em|rem)?$/)) {
-                        // If invalid format, revert to previous value
-                        updateColumnWidth(column.fieldName, column.width || '');
-                      }
-                    }}
-                  />
+                <Box direction="horizontal" gap="SP1" align="center" style={{ alignItems: 'center' }}>
+                  <Box width="60px">
+                    <Input
+                      size="small"
+                      value={column.width ? column.width.replace('px', '') : ''}
+                      placeholder="Auto"
+                      onChange={(e) => {
+                        const numericValue = e.target.value.trim();
+                        const width = numericValue ? `${numericValue}px` : '';
+                        updateColumnWidth(column.fieldName, width);
+                      }}
+                      onBlur={(e) => {
+                        // Validate numeric input
+                        const value = e.target.value.trim();
+                        if (value && !value.match(/^\d+$/)) {
+                          // If invalid format, revert to previous value
+                          const currentWidth = column.width || '';
+                          updateColumnWidth(column.fieldName, currentWidth);
+                        }
+                      }}
+                    />
+                  </Box>
+                  {column.width && column.width !== 'Auto' && (
+                    <Text size="small" color="secondary">px</Text>
+                  )}
                 </Box>
               ),
               width: '120px',
@@ -438,16 +459,56 @@ const SettingsPage: React.FC = () => {
 
         <Page.Content>
           <Box direction="vertical" backgroundColor="red" align="center" gap="SP4">
-            {/* Form Selector */}
+            {/* Form Selector and Name Editor */}
             <Card>
               <Card.Content>
+                <Box direction="vertical" gap="SP4">
+                  <FormSelector
+                    availableForms={availableForms}
+                    selectedFormId={selectedFormId}
+                    onFormSelect={setSelectedFormId}
+                    loading={dataLoading}
+                  />
 
-                <FormSelector
-                  availableForms={availableForms}
-                  selectedFormId={selectedFormId}
-                  onFormSelect={setSelectedFormId}
-                  loading={dataLoading}
-                />
+                  {selectedForm && (
+                    <Box direction="vertical" gap="SP2">
+                      <Text size="small" weight="bold">Custom Form Name</Text>
+                      <Box direction="horizontal" gap="SP2" align="center">
+                        <Box width="300px">
+                          <Input
+                            placeholder={selectedForm.name}
+                            value={formTableSettingsStore.getCustomFormName(selectedFormId!) || ''}
+                            onChange={(e) => {
+                              const customName = e.target.value;
+                              if (selectedFormId) {
+                                updateFormName(selectedFormId, customName);
+                              }
+                            }}
+                            size="medium"
+                          />
+                        </Box>
+                        <Button
+                          size="small"
+                          priority="secondary"
+                          onClick={() => {
+                            if (selectedFormId) {
+                              updateFormName(selectedFormId, '');
+                              dashboard.showToast({
+                                message: 'Form name reset to default',
+                                type: 'success',
+                              });
+                            }
+                          }}
+                        >
+                          Reset
+                        </Button>
+                      </Box>
+                      <Text size="small" color="secondary">
+                        Leave empty to use default name: {selectedForm.name}
+                      </Text>
+                    </Box>
+                  )}
+                </Box>
               </Card.Content>
             </Card>
 
