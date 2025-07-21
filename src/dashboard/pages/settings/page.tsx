@@ -19,7 +19,9 @@ import {
   Loader,
   Badge,
   WixDesignSystemProvider,
-  Input
+  Input,
+  TextButton,
+  Tooltip
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
@@ -36,7 +38,8 @@ import { observer } from 'mobx-react-lite';
 const SettingsPage: React.FC = () => {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [showDebug, setShowDebug] = useState(true); // Set to false to hide debug panel
+  const [isEditingFormName, setIsEditingFormName] = useState(false);
+
 
   // Get forms and data
   const { allSubmissions, loading: dataLoading } = usePatientData();
@@ -458,110 +461,179 @@ const SettingsPage: React.FC = () => {
         />
 
         <Page.Content>
-          <Box direction="vertical" backgroundColor="red" align="center" gap="SP4">
+          <Box direction="vertical" backgroundColor="red" align="left" gap="SP4">
             {/* Form Selector and Name Editor */}
-            <Card>
-              <Card.Content>
-                <Box direction="vertical" gap="SP4">
+            <Box direction="vertical" align="left" gap="SP4" width="100%" backgroundColor="white" borderRadius="8px">
+              <Card>
+                <Card.Content>
                   <FormSelector
                     availableForms={availableForms}
                     selectedFormId={selectedFormId}
                     onFormSelect={setSelectedFormId}
                     loading={dataLoading}
                   />
-
-                  {selectedForm && (
-                    <Box direction="vertical" gap="SP2">
-                      <Text size="small" weight="bold">Custom Form Name</Text>
-                      <Box direction="horizontal" gap="SP2" align="center">
-                        <Box width="300px">
-                          <Input
-                            placeholder={selectedForm.name}
-                            value={formTableSettingsStore.getCustomFormName(selectedFormId!) || ''}
-                            onChange={(e) => {
-                              const customName = e.target.value;
-                              if (selectedFormId) {
-                                updateFormName(selectedFormId, customName);
-                              }
-                            }}
-                            size="medium"
-                          />
-                        </Box>
-                        <Button
-                          size="small"
-                          priority="secondary"
-                          onClick={() => {
-                            if (selectedFormId) {
-                              updateFormName(selectedFormId, '');
-                              dashboard.showToast({
-                                message: 'Form name reset to default',
-                                type: 'success',
-                              });
-                            }
-                          }}
-                        >
-                          Reset
-                        </Button>
-                      </Box>
-                      <Text size="small" color="secondary">
-                        Leave empty to use default name: {selectedForm.name}
-                      </Text>
-                    </Box>
-                  )}
-                </Box>
-              </Card.Content>
-            </Card>
+                </Card.Content>
+              </Card>
+            </Box>
 
             {selectedForm ? (
-              <Card hideOverflow>
-                <Table data={tableData} columns={columns} rowVerticalPadding="medium">
-                  {/* Table Toolbar */}
-                  <TableToolbar>
-                    <TableToolbar.ItemGroup position="start">
-                      <TableToolbar.Item>
-                        <TableToolbar.Title>Column Configuration</TableToolbar.Title>
-                      </TableToolbar.Item>
-                    </TableToolbar.ItemGroup>
-                    <TableToolbar.ItemGroup position="end">
-                      <TableToolbar.Item>
-                        <Text size="small" color="secondary">
-                          {visibleColumnsCount} of {totalColumnsCount} columns visible
-                        </Text>
-                      </TableToolbar.Item>
-                    </TableToolbar.ItemGroup>
-                  </TableToolbar>
+              <Box direction="horizontal" align="left" gap="SP4" width="100%" backgroundColor="pink" borderRadius="8px">
 
-                  {/* Sticky Header with Select All */}
-                  <Page.Sticky>
+                <Card hideOverflow>
+                  <Table data={tableData} columns={columns} rowVerticalPadding="medium">
+                    {/* Table Toolbar */}
+                    <TableToolbar>
+                      <TableToolbar.ItemGroup position="start">
+                        <TableToolbar.Item>
+                          {!isEditingFormName ? (
+                            <Box direction="horizontal" gap="SP1" style={{ alignItems: "center" }}>
+                              <TableToolbar.Title>
+                                {formTableSettingsStore.getCustomFormName(selectedFormId!) || selectedForm.name}
+                              </TableToolbar.Title>
+                              <TextButton
+                                size="tiny"
+                                onClick={() => setIsEditingFormName(true)}
+                                underline="onHover"
+                              >
+                                Edit Name
+                              </TextButton>
+                            </Box>
+                          ) : (
+                            <Box direction="horizontal" gap="SP2" align="center">
+                              <Box width="250px">
+                                <Tooltip
+                                  content={`Leave empty to use default name: ${selectedForm.name}`}
+                                  placement="bottom"
+                                >
+                                  <Input
+                                    placeholder={selectedForm.name}
+                                    value={formTableSettingsStore.getCustomFormName(selectedFormId!) || ''}
+                                    onChange={(e) => {
+                                      const customName = e.target.value;
+                                      if (selectedFormId) {
+                                        updateFormName(selectedFormId, customName);
+                                      }
+                                    }}
+                                    size="small"
+                                  />
+                                </Tooltip>
+                              </Box>
+                              <Button
+                                size="small"
+                                priority="secondary"
+                                onClick={() => {
+                                  setIsEditingFormName(false);
+                                  dashboard.showToast({
+                                    message: 'Form name updated',
+                                    type: 'success',
+                                  });
+                                }}
+                              >
+                                Done
+                              </Button>
+                              <Button
+                                size="small"
+                                priority="secondary"
+                                onClick={() => {
+                                  if (selectedFormId) {
+                                    updateFormName(selectedFormId, '');
+                                    setIsEditingFormName(false);
+                                    dashboard.showToast({
+                                      message: 'Form name reset to default',
+                                      type: 'success',
+                                    });
+                                  }
+                                }}
+                              >
+                                Reset
+                              </Button>
+                            </Box>
+                          )}
+                        </TableToolbar.Item>
+                      </TableToolbar.ItemGroup>
+                      <TableToolbar.ItemGroup position="end">
+                        <TableToolbar.Item>
+                          <Text size="small" color="secondary">
+                            {visibleColumnsCount} of {totalColumnsCount} columns visible
+                          </Text>
+                        </TableToolbar.Item>
+                      </TableToolbar.ItemGroup>
+                    </TableToolbar>
+
+                    {/* Sticky Header with Select All */}
+                    <Page.Sticky>
+                      <Card>
+                        <TableListHeader
+                          options={headerOptions}
+                          checkboxState={getCheckboxState()}
+                          onCheckboxChange={handleSelectAll}
+                          onSortChange={() => { }} // No sorting needed for settings
+                        />
+                      </Card>
+                    </Page.Sticky>
+
+                    {/* Table Content using SortableListBase for drag and drop */}
                     <Card>
-                      <TableListHeader
-                        options={headerOptions}
-                        checkboxState={getCheckboxState()}
-                        onCheckboxChange={handleSelectAll}
-                        onSortChange={() => { }} // No sorting needed for settings
-                      />
+                      {items.length > 0 ? (
+                        <SortableListBase
+                          items={items}
+                          renderItem={renderItem}
+                          onDrop={handleDrop}
+                          canDrag={canDrag}
+                        />
+                      ) : (
+                        <Box padding="40px" textAlign="center">
+                          <Text size="medium" color="secondary">
+                            No fields available for this form
+                          </Text>
+                        </Box>
+                      )}
                     </Card>
-                  </Page.Sticky>
+                  </Table>
+                </Card>
 
-                  {/* Table Content using SortableListBase for drag and drop */}
+
+                {/* Settings Summary */}
+                {settings && (
                   <Card>
-                    {items.length > 0 ? (
-                      <SortableListBase
-                        items={items}
-                        renderItem={renderItem}
-                        onDrop={handleDrop}
-                        canDrag={canDrag}
-                      />
-                    ) : (
-                      <Box padding="40px" textAlign="center">
-                        <Text size="medium" color="secondary">
-                          No fields available for this form
-                        </Text>
+                    <Card.Header title="Form Summary" />
+                    <Card.Content>
+                      <Box minWidth="300px" align="left" direction="vertical" gap="SP2">
+                        <Box direction="horizontal" align="center" gap="SP2">
+                          <Text>Total Columns:</Text>
+                          <Text weight="bold">{totalColumnsCount}</Text>
+                        </Box>
+                        <Box direction="horizontal" align="center" gap="SP2">
+                          <Text>Visible Columns:</Text>
+                          <Text weight="bold" color={visibleColumnsCount > 0 ? 'success' : 'warning'}>
+                            {visibleColumnsCount}
+                          </Text>
+                        </Box>
+                        <Box direction="horizontal" align="center" gap="SP2">
+                          <Text>Hidden Columns:</Text>
+                          <Text weight="bold">{totalColumnsCount - visibleColumnsCount}</Text>
+                        </Box>
+                        {settings.lastUpdated && (
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text>Last Updated:</Text>
+                            <Text size="medium" weight="bold" color="secondary">
+                              {new Date(settings.lastUpdated).toLocaleDateString()}
+                            </Text>
+                          </Box>
+                        )}
+                        {selectedForm && (
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text>Form:</Text>
+                            <Text size="medium" weight="bold" color="secondary">
+                              {selectedForm.name}
+                            </Text>
+                          </Box>
+                        )}
                       </Box>
-                    )}
+                    </Card.Content>
                   </Card>
-                </Table>
-              </Card>
+                )}
+              </Box>
             ) : (
               <Box
                 textAlign="center"
@@ -579,112 +651,6 @@ const SettingsPage: React.FC = () => {
               </Box>
             )}
 
-            {/* Debug Panel */}
-            {showDebug && (
-              <Card>
-                <Card.Header title="Debug Information" />
-                <Card.Content>
-                  <Box direction="vertical" gap="SP2">
-                    <Box direction="horizontal" gap="SP4">
-                      <Text size="small">Selected Form ID: {selectedFormId || 'None'}</Text>
-                      <Text size="small">Window Form ID: {typeof window !== 'undefined' ? window.wixCurrentFormId || 'None' : 'N/A'}</Text>
-                    </Box>
-                    <Box direction="horizontal" gap="SP4">
-                      <Text size="small">Available Forms: {availableForms.length}</Text>
-                      <Text size="small">Settings Loaded: {settings ? 'Yes' : 'No'}</Text>
-                      <Text size="small">Settings Form ID: {settings?.formId || 'None'}</Text>
-                    </Box>
-                    <Box direction="horizontal" gap="SP2">
-                      <Button
-                        size="small"
-                        priority="secondary"
-                        onClick={() => {
-                          console.log('Debug: Current state:', {
-                            selectedFormId,
-                            windowFormId: typeof window !== 'undefined' ? window.wixCurrentFormId : undefined,
-                            availableForms: availableForms.map(f => ({ id: f.formId, name: f.name })),
-                            settings: settings ? { formId: settings.formId, columnsCount: settings.columns.length } : null,
-                            allStoredSettings: typeof window !== 'undefined' ? window.wixFormDashboardSettings : undefined
-                          });
-                        }}
-                      >
-                        Log Debug Info
-                      </Button>
-                      <Button
-                        size="small"
-                        priority="secondary"
-                        onClick={() => {
-                          if (selectedFormId && selectedForm) {
-                            console.log('Debug: Testing reset function directly');
-                            formTableSettingsStore.resetFormToDefaults(selectedFormId, selectedForm.fields);
-                            console.log('Debug: Reset called, current visible columns:', formTableSettingsStore.getVisibleColumns(selectedFormId).length);
-                          }
-                        }}
-                      >
-                        Test Reset (Debug)
-                      </Button>
-                      <Button
-                        size="small"
-                        priority="secondary"
-                        onClick={() => {
-                          if (typeof window !== 'undefined') {
-                            delete window.wixFormDashboardSettings;
-                            delete window.wixFormDashboardSettingsBackup;
-                            delete window.wixCurrentFormId;
-                            sessionStorage.removeItem('wixFormDashboardSettings');
-                            sessionStorage.removeItem('wixCurrentFormId');
-                            console.log('Debug: Cleared all storage including sessionStorage');
-                          }
-                        }}
-                      >
-                        Clear All Storage
-                      </Button>
-                    </Box>
-                  </Box>
-                </Card.Content>
-              </Card>
-            )}
-
-            {/* Settings Summary */}
-            {settings && (
-              <Card>
-                <Card.Header title="Settings Summary" />
-                <Card.Content>
-                  <Box direction="vertical" gap="SP2">
-                    <Box direction="horizontal" align="center" gap="SP2">
-                      <Text>Total Columns:</Text>
-                      <Text weight="bold">{totalColumnsCount}</Text>
-                    </Box>
-                    <Box direction="horizontal" align="center" gap="SP2">
-                      <Text>Visible Columns:</Text>
-                      <Text weight="bold" color={visibleColumnsCount > 0 ? 'success' : 'warning'}>
-                        {visibleColumnsCount}
-                      </Text>
-                    </Box>
-                    <Box direction="horizontal" align="center" gap="SP2">
-                      <Text>Hidden Columns:</Text>
-                      <Text weight="bold">{totalColumnsCount - visibleColumnsCount}</Text>
-                    </Box>
-                    {settings.lastUpdated && (
-                      <Box direction="horizontal" align="center" gap="SP2">
-                        <Text>Last Updated:</Text>
-                        <Text size="small" color="secondary">
-                          {new Date(settings.lastUpdated).toLocaleDateString()}
-                        </Text>
-                      </Box>
-                    )}
-                    {selectedForm && (
-                      <Box direction="horizontal" align="center" gap="SP2">
-                        <Text>Form:</Text>
-                        <Text size="small" color="secondary">
-                          {selectedForm.name}
-                        </Text>
-                      </Box>
-                    )}
-                  </Box>
-                </Card.Content>
-              </Card>
-            )}
           </Box>
         </Page.Content>
       </Page>
