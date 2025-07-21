@@ -16,7 +16,8 @@ import {
     Input,
     IconButton,
     TextButton,
-    TagList
+    TagList,
+    Table
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { GenericSubmission, FormField, FieldType } from '../types';
@@ -124,23 +125,21 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                 return columnSetting.width;
             }
         }
+
+        // For few columns, calculate percentage widths to fill 100%
+        if (safeVisibleColumns.length <= 4) {
+            const totalColumns = safeVisibleColumns.length + 1; // +1 for actions column
+            const columnPercentage = Math.floor((100 - 15) / safeVisibleColumns.length); // Reserve 15% for actions
+            return `${columnPercentage}%`;
+        }
+
         return getDefaultColumnWidth(field, index);
     };
 
     const hasNoSubmissions = submissions.length === 0;
     return (
         <Box direction="vertical" gap="SP4">
-            <Box
-                style={{
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflowX: 'auto',
-                    minWidth: '100%',
-                    minHeight: hasNoSubmissions ? '100px' : 'auto'
-                }}
-            >
+            <Card hideOverflow>
                 <style>{`
                     .generic-table-container table tbody tr {
                         transition: background-color 0.15s ease;
@@ -196,12 +195,98 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         position: sticky !important;
                         right: 0px !important;
                         z-index: 1 !important;
-                        background-color: white !important;
-                        box-shadow: -2px 0 4px rgba(0,0,0,0.1);
                     }
                 `}</style>
 
-                <Card>
+                <Table
+                    horizontalScroll={safeVisibleColumns.length > 6} // Use horizontal scroll when more than 6 columns
+                    data={currentSubmissions.map((submission, index) => ({
+                        ...submission,
+                        _index: index,
+                        _submissionData: submission
+                    }))}
+                    onRowClick={(row) => onViewSubmission(row._submissionData)}
+                    columns={[
+                        ...safeVisibleColumns.map((field, index) => ({
+                            title: field.name === '_createdDate' || field.name === '_updatedDate' ? (
+                                <div
+                                    style={{
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                    }}
+                                    onClick={() => handleSort(field.name)}
+                                >
+                                    <Text size="small">
+                                        {field.label}
+                                    </Text>
+                                    {sortField === field.name && (
+                                        <Text size="small" color="primary" >
+                                            {sortOrder === 'desc' ? '↓' : '↑'}
+                                        </Text>
+                                    )}
+                                </div>
+                            ) : (
+                                <Text size="small">
+                                    {field.label}
+                                </Text>
+                            ),
+                            render: (row: any) => renderFieldValue(row._submissionData, field, index === 0),
+                            width: getColumnWidth(field, index),
+                            align: 'start' as const
+                        })),
+                        {
+                            title: (
+                                <Text size="small" weight="normal">
+                                    Actions
+                                </Text>
+                            ),
+                            render: (row: any) => (
+                                <div onClick={(e) => e.stopPropagation()}>
+                                    <PopoverMenu
+                                        textSize="small"
+                                        triggerElement={
+                                            <IconButton
+                                                skin="inverted"
+                                                size="small"
+                                            >
+                                                <Icons.More />
+                                            </IconButton>
+                                        }
+                                        placement="top"
+                                    >
+                                        <PopoverMenu.MenuItem
+                                            text="Preview"
+                                            onClick={() => onViewSubmission(row._submissionData)}
+                                            prefixIcon={<Icons.Visible />}
+                                        />
+                                        <PopoverMenu.MenuItem
+                                            text="Print"
+                                            onClick={() => onPrintSubmission(row._submissionData)}
+                                            prefixIcon={<Icons.Print />}
+                                        />
+                                        <PopoverMenu.MenuItem
+                                            text="Edit"
+                                            onClick={() => onEditSubmission(row._submissionData)}
+                                            prefixIcon={<Icons.Edit />}
+                                        />
+                                        <PopoverMenu.Divider />
+                                        <PopoverMenu.MenuItem
+                                            text="Delete"
+                                            onClick={() => onDeleteSubmission(row._submissionData._id)}
+                                            prefixIcon={<Icons.Delete />}
+                                            skin="destructive"
+                                        />
+                                    </PopoverMenu>
+                                </div>
+                            ),
+                            width: safeVisibleColumns.length <= 4 ? '100px' : '100px', // Keep fixed width for actions
+                            align: 'end' as const,
+                            stickyActionCell: safeVisibleColumns.length > 4 // Only sticky when many columns
+                        }
+                    ]}
+                >
                     <TableToolbar>
                         <TableToolbar.ItemGroup position="start">
                             <TableToolbar.Item>
@@ -220,9 +305,17 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                 </TableToolbar.Item>
                             )}
                             <TableToolbar.Item>
-                                <Badge skin="neutralLight" size="small">
-                                    {safeVisibleColumns.length} of {formFields.length} columns shown
-                                </Badge>
+                                {(() => {
+                                    // Count total possible columns (form fields + system fields)
+                                    const systemFields = ['_createdDate'];
+                                    const totalPossibleColumns = formFields.length + systemFields.length;
+
+                                    return (
+                                        <Badge skin="neutralLight" size="small">
+                                            {safeVisibleColumns.length} of {totalPossibleColumns} columns shown
+                                        </Badge>
+                                    );
+                                })()}
                             </TableToolbar.Item>
                         </TableToolbar.ItemGroup>
                         <TableToolbar.ItemGroup position="end">
@@ -239,236 +332,45 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         </TableToolbar.ItemGroup>
                     </TableToolbar>
 
-                    <Box
-                        direction="vertical"
-                        style={{
-                            overflowX: 'auto',
-                            minWidth: '100%',
-                            width: 'max-content'
-                        }}
-                        className="generic-table-container"
-                    >
-                        {/* Table Header */}
-                        <Box
-                            direction="horizontal"
-                            padding="8px 0px"
-                            backgroundColor="#d9e5fc"
-                            style={{
-                                alignItems: 'center',
-                                borderTop: '1px solid #afc9fa',
-                                borderBottom: '1px solid #afc9fa',
-                                minWidth: 'max-content',
-                                display: 'flex'
-                            }}
-                        >
-                            {safeVisibleColumns.map((field, index) => (
-                                <div
-                                    key={field.name}
-                                    style={{
-                                        width: getColumnWidth(field, index),
-                                        minWidth: getColumnWidth(field, index),
-                                        maxWidth: getColumnWidth(field, index),
-                                        flex: 'none',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        cursor: field.name === '_createdDate' || field.name === '_updatedDate' ? 'pointer' : 'default',
-                                        padding: '0 16px',
-                                        boxSizing: 'border-box'
-                                    }}
-                                    onClick={() => {
-                                        if (field.name === '_createdDate' || field.name === '_updatedDate') {
-                                            handleSort(field.name);
-                                        }
-                                    }}
-                                >
-                                    <Text
-                                        size="small"
-                                        weight="normal"
-                                        color="#1976D2"
-                                        style={{
-                                            cursor: field.name === '_createdDate' || field.name === '_updatedDate' ? 'pointer' : 'default',
-                                            userSelect: 'none',
-                                            textOverflow: 'ellipsis',
-                                            overflow: 'hidden',
-                                            whiteSpace: 'nowrap',
-                                            width: '100%'
-                                        }}
-                                    >
-                                        {field.label}
-                                        {sortField === field.name && (
-                                            <span style={{
-                                                marginLeft: '4px',
-                                                color: '#1976D2',
-                                                fontWeight: 'bold'
-                                            }}>
-                                                {sortOrder === 'desc' ? '↓' : '↑'}
-                                            </span>
-                                        )}
-                                    </Text>
-                                </div>
-                            ))}
-
-                            {/* Actions Column Header */}
-                            <div
-                                style={{
-                                    width: '100px',
-                                    minWidth: '100px',
-                                    maxWidth: '100px',
-                                    flex: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    padding: '0 16px',
-                                    boxSizing: 'border-box'
-                                }}
-                            >
-                                <Text size="small" weight="normal" color="#1976D2">Actions</Text>
-                            </div>
-                        </Box>
-
-                        {hasNoSubmissions && (
-                            <Box
-                                width="100%"
-                                padding="20px"
-                                textAlign="center"
-                                borderTop="1px solid #e0e0e0"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minHeight: '150px',
-                                    backgroundColor: '#f9f9f9'
-                                }}
-                            >
-                                <Text size="medium" weight="normal">No submissions found</Text>
-                            </Box>
-                        )}
-
-                        {/* Table Rows */}
-                        <Box direction="vertical">
-                            {currentSubmissions.map((submission) => (
-                                <div
-                                    key={submission._id}
-                                    onClick={() => onViewSubmission(submission)}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <div
-                                        style={{
-                                            alignItems: 'center',
-                                            minHeight: '56px',
-                                            transition: 'background-color 0.15s ease',
-                                            borderBottom: '1px solid #EAEAEA',
-                                            display: 'flex',
-                                            minWidth: 'max-content',
-                                            backgroundColor: '#FFFFFF'
-                                        }}
-                                        className="table-row-hover"
-                                    >
-                                        {safeVisibleColumns.map((field, index) => (
-                                            <div
-                                                key={field.name}
-                                                style={{
-                                                    width: getColumnWidth(field, index),
-                                                    minWidth: getColumnWidth(field, index),
-                                                    maxWidth: getColumnWidth(field, index),
-                                                    flex: 'none',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    padding: '8px 16px',
-                                                    boxSizing: 'border-box',
-                                                    height: '56px'
-                                                }}
-                                            >
-                                                {renderFieldValue(submission, field, index === 0)}
-                                            </div>
-                                        ))}
-
-                                        {/* Actions Column */}
-                                        <div
-                                            style={{
-                                                width: '100px',
-                                                minWidth: '100px',
-                                                maxWidth: '100px',
-                                                flex: 'none',
-                                                padding: '8px 16px',
-                                                boxSizing: 'border-box',
-                                                display: 'flex',
-                                                justifyContent: 'flex-end',
-                                                alignItems: 'center',
-                                                height: '56px'
-                                            }}
-                                            className="actions-column"
-                                        >
-                                            <div onClick={(e) => e.stopPropagation()}>
-                                                <PopoverMenu
-                                                    textSize="small"
-                                                    triggerElement={
-                                                        <IconButton
-                                                            skin="inverted"
-                                                            size="small"
-                                                        >
-                                                            <Icons.More />
-                                                        </IconButton>
-                                                    }
-                                                    placement="top"
-                                                >
-                                                    <PopoverMenu.MenuItem
-                                                        text="Preview"
-                                                        onClick={() => onViewSubmission(submission)}
-                                                        prefixIcon={<Icons.Visible />}
-                                                    />
-                                                    <PopoverMenu.MenuItem
-                                                        text="Print"
-                                                        onClick={() => onPrintSubmission(submission)}
-                                                        prefixIcon={<Icons.Print />}
-                                                    />
-                                                    <PopoverMenu.MenuItem
-                                                        text="Edit"
-                                                        onClick={() => onEditSubmission(submission)}
-                                                        prefixIcon={<Icons.Edit />}
-                                                    />
-                                                    <PopoverMenu.Divider />
-                                                    <PopoverMenu.MenuItem
-                                                        text="Delete"
-                                                        onClick={() => onDeleteSubmission(submission._id)}
-                                                        prefixIcon={<Icons.Delete />}
-                                                        skin="destructive"
-                                                    />
-                                                </PopoverMenu>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                    {hasNoSubmissions ? (
+                        <Table.EmptyState
+                            title="No submissions found"
+                            subtitle="There are no submissions for the selected form"
+                        />
+                    ) : (
+                        <Table.Content />
+                    )}
+                </Table>
+            </Card>
+            {/* Pagination */}
+            {
+                totalPages > 1 && (
+                    <Box direction="vertical" gap="SP1" align="center">
+                        <Pagination
+                            totalPages={totalPages}
+                            currentPage={currentPage}
+                            onChange={(event) => setCurrentPage(event.page)}
+                        />
+                        <Box textAlign="center">
+                            <Text size="small">
+                                Showing {startIndex + 1} to {endIndex} of {filteredSubmissions.length} submissions
+                                {searchTerm && ` (filtered from ${totalSubmissions} total)`}
+                            </Text>
                         </Box>
                     </Box>
-                </Card>
-            </Box>
+                )
+            }
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-                <Box direction="vertical" gap="SP1" align="center">
-                    <Pagination
-                        totalPages={totalPages}
-                        currentPage={currentPage}
-                        onChange={(event) => setCurrentPage(event.page)}
-                    />
-                    <Box textAlign="center">
+            {
+                totalPages <= 1 && (
+                    <Box align="center">
                         <Text size="small">
-                            Showing {startIndex + 1} to {endIndex} of {filteredSubmissions.length} submissions
-                            {searchTerm && ` (filtered from ${totalSubmissions} total)`}
+                            Showing all {submissions.length} submissions
                         </Text>
                     </Box>
-                </Box>
-            )}
-
-            {totalPages <= 1 && (
-                <Box align="center">
-                    <Text size="small">
-                        Showing all {submissions.length} submissions
-                    </Text>
-                </Box>
-            )}
-        </Box>
+                )
+            }
+        </Box >
     );
 };
 
@@ -477,55 +379,61 @@ function getDefaultColumnWidth(field: FormField, index: number): string {
     const fieldName = field.name.toLowerCase();
 
     // First column (Created date)
-    if (index === 0) return '110px';
+    if (index === 0) return '220px';
 
+    // PRIORITY 1: Field Type-based widths
+    switch (field.type) {
+        case FieldType.EMAIL:
+            return '400px';
+        case FieldType.PHONE:
+            return '260px';
+        case FieldType.DATE:
+            return '200px';
+        case FieldType.BOOLEAN:
+            return '180px';
+        case FieldType.ARRAY:
+            return '320px'; // Arrays need more space for multiple values
+        case FieldType.OBJECT:
+            return '280px'; // Objects need space for structured data
+        case FieldType.TEXTAREA:
+            return '400px'; // Long text needs more space
+        case FieldType.URL:
+            return '300px'; // URLs can be long
+        case FieldType.NUMBER:
+            return '160px'; // Numbers are typically shorter
+        case FieldType.SELECT:
+            return '200px'; // Select options are usually medium length
+        case FieldType.TEXT:
+            // Fall through to check field name patterns for TEXT type
+            break;
+        default:
+            // Fall through to check field name patterns
+            break;
+    }
+
+    // PRIORITY 2: Field Name Pattern-based widths (only for TEXT and unknown types)
     // Name fields
-    if (fieldName.includes('name') || fieldName.includes('vorname') || fieldName.includes('nachname')) {
-        return '140px';
+    if (fieldName.includes('name')) {
+        return '280px';
     }
 
-    // Email fields
-    if (field.type === FieldType.EMAIL || fieldName.includes('email') || fieldName.includes('mail')) {
-        return '200px';
+    // Address fields (if not already caught by type)
+    if (fieldName.includes('address')) {
+        return '360px';
     }
 
-    // Phone fields
-    if (field.type === FieldType.PHONE || fieldName.includes('telefon') || fieldName.includes('phone')) {
-        return '130px';
+    // Description/comment fields
+    if (fieldName.includes('description')) {
+        return '400px';
     }
 
-    // Date fields
-    if (field.type === FieldType.DATE || fieldName.includes('datum') || fieldName.includes('date') || fieldName.includes('birth')) {
-        return '100px';
-    }
-
-    // Boolean/Short answer fields
-    if (field.type === FieldType.BOOLEAN || fieldName.includes('activ') || fieldName.includes('mailbox')) {
-        return '90px';
-    }
-
-    // Address fields
-    if (fieldName.includes('address') || fieldName.includes('adresse') || fieldName.includes('street') || fieldName.includes('strasse')) {
-        return '180px';
-    }
-
-    // Gender/short selection fields
-    if (fieldName.includes('geschlecht') || fieldName.includes('gender')) {
-        return '80px';
-    }
-
-    // Array fields
-    if (field.type === FieldType.ARRAY) {
-        return '120px';
-    }
-
-    // Textarea/long text fields
-    if (field.type === FieldType.TEXTAREA) {
+    // ID fields
+    if (fieldName.includes('id') || fieldName.includes('guid')) {
         return '200px';
     }
 
     // Default width for other fields
-    return '120px';
+    return '240px';
 }
 
 function renderFieldValue(submission: GenericSubmission, field: FormField, isFirstColumn: boolean): React.ReactNode {

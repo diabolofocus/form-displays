@@ -21,7 +21,8 @@ import {
   WixDesignSystemProvider,
   Input,
   TextButton,
-  Tooltip
+  Tooltip,
+  Breadcrumbs
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
@@ -430,16 +431,30 @@ const SettingsPage: React.FC = () => {
         <Page.Header
           title="Table Settings"
           subtitle="Configure which columns to display and their order"
+          showBackButton
+          onBackClicked={handleBackToDashboard}
+          breadcrumbs={
+            <Breadcrumbs
+              items={[
+                {
+                  id: 'dashboard',
+                  value: 'Dashboard'
+                },
+                {
+                  id: 'settings',
+                  value: 'Settings'
+                }
+              ]}
+              activeId="settings"
+              onClick={(item) => {
+                if (item.id === 'dashboard') {
+                  handleBackToDashboard();
+                }
+              }}
+            />
+          }
           actionsBar={
             <Box direction="horizontal" gap="SP3">
-              <Button
-                onClick={handleBackToDashboard}
-                priority="secondary"
-                prefixIcon={<Icons.ChevronLeft />}
-                disabled={isNavigating}
-              >
-                Back to Dashboard
-              </Button>
               <Button
                 onClick={handleResetToDefaults}
                 priority="secondary"
@@ -461,7 +476,7 @@ const SettingsPage: React.FC = () => {
         />
 
         <Page.Content>
-          <Box direction="vertical" backgroundColor="red" align="left" gap="SP4">
+          <Box direction="vertical" align="left" gap="SP4">
             {/* Form Selector and Name Editor */}
             <Box direction="vertical" align="left" gap="SP4" width="100%" backgroundColor="white" borderRadius="8px">
               <Card>
@@ -477,7 +492,7 @@ const SettingsPage: React.FC = () => {
             </Box>
 
             {selectedForm ? (
-              <Box direction="horizontal" align="left" gap="SP4" width="100%" backgroundColor="pink" borderRadius="8px">
+              <Box direction="horizontal" align="left" gap="SP4" width="100%" borderRadius="8px">
 
                 <Card hideOverflow>
                   <Table data={tableData} columns={columns} rowVerticalPadding="medium">
@@ -486,7 +501,7 @@ const SettingsPage: React.FC = () => {
                       <TableToolbar.ItemGroup position="start">
                         <TableToolbar.Item>
                           {!isEditingFormName ? (
-                            <Box direction="horizontal" gap="SP1" style={{ alignItems: "center" }}>
+                            <Box direction="horizontal" gap="SP1" align="center">
                               <TableToolbar.Title>
                                 {formTableSettingsStore.getCustomFormName(selectedFormId!) || selectedForm.name}
                               </TableToolbar.Title>
@@ -500,7 +515,7 @@ const SettingsPage: React.FC = () => {
                             </Box>
                           ) : (
                             <Box direction="horizontal" gap="SP2" align="center">
-                              <Box width="250px">
+                              <Box width="200px">
                                 <Tooltip
                                   content={`Leave empty to use default name: ${selectedForm.name}`}
                                   placement="bottom"
@@ -514,23 +529,11 @@ const SettingsPage: React.FC = () => {
                                         updateFormName(selectedFormId, customName);
                                       }
                                     }}
-                                    size="small"
+                                    size="medium"
                                   />
                                 </Tooltip>
                               </Box>
-                              <Button
-                                size="small"
-                                priority="secondary"
-                                onClick={() => {
-                                  setIsEditingFormName(false);
-                                  dashboard.showToast({
-                                    message: 'Form name updated',
-                                    type: 'success',
-                                  });
-                                }}
-                              >
-                                Done
-                              </Button>
+
                               <Button
                                 size="small"
                                 priority="secondary"
@@ -546,6 +549,19 @@ const SettingsPage: React.FC = () => {
                                 }}
                               >
                                 Reset
+                              </Button>
+                              <Button
+                                size="small"
+                                priority="primary"
+                                onClick={() => {
+                                  setIsEditingFormName(false);
+                                  dashboard.showToast({
+                                    message: 'Form name updated',
+                                    type: 'success',
+                                  });
+                                }}
+                              >
+                                Done
                               </Button>
                             </Box>
                           )}
@@ -598,33 +614,33 @@ const SettingsPage: React.FC = () => {
                   <Card>
                     <Card.Header title="Form Summary" />
                     <Card.Content>
-                      <Box minWidth="300px" align="left" direction="vertical" gap="SP2">
-                        <Box direction="horizontal" align="center" gap="SP2">
-                          <Text>Total Columns:</Text>
-                          <Text weight="bold">{totalColumnsCount}</Text>
+                      <Box minWidth="260px" align="left" direction="vertical" gap="SP2">
+                        <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                          <Text align="bottom" size="small">Total Columns:</Text>
+                          <Text align="bottom" size="small" weight="bold">{totalColumnsCount}</Text>
                         </Box>
-                        <Box direction="horizontal" align="center" gap="SP2">
-                          <Text>Visible Columns:</Text>
-                          <Text weight="bold" color={visibleColumnsCount > 0 ? 'success' : 'warning'}>
+                        <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                          <Text size="small">Visible Columns:</Text>
+                          <Text size="small" align="bottom" weight="bold" color={visibleColumnsCount > 0 ? 'success' : 'warning'}>
                             {visibleColumnsCount}
                           </Text>
                         </Box>
-                        <Box direction="horizontal" align="center" gap="SP2">
-                          <Text>Hidden Columns:</Text>
-                          <Text weight="bold">{totalColumnsCount - visibleColumnsCount}</Text>
+                        <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                          <Text size="small" align="bottom">Hidden Columns:</Text>
+                          <Text size="small" align="bottom" weight="bold">{totalColumnsCount - visibleColumnsCount}</Text>
                         </Box>
                         {settings.lastUpdated && (
                           <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                            <Text>Last Updated:</Text>
-                            <Text size="medium" weight="bold" color="secondary">
+                            <Text size="small" align="bottom">Last Updated:</Text>
+                            <Text size="small" align="bottom" weight="bold" color="secondary">
                               {new Date(settings.lastUpdated).toLocaleDateString()}
                             </Text>
                           </Box>
                         )}
                         {selectedForm && (
                           <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                            <Text>Form:</Text>
-                            <Text size="medium" weight="bold" color="secondary">
+                            <Text size="small" align="bottom">Form:</Text>
+                            <Text size="small" align="bottom" weight="bold" color="secondary">
                               {selectedForm.name}
                             </Text>
                           </Box>

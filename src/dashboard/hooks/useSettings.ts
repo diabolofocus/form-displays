@@ -448,46 +448,57 @@ function mergeWithCurrentFields(savedSettings: FormSettings, currentFields: Form
 function getDefaultColumnWidth(field: FormField): string {
     const fieldName = field.name.toLowerCase();
 
-    // Name fields
+    // PRIORITY 1: Field Type-based widths
+    switch (field.type) {
+        case FieldType.EMAIL:
+            return '300px';
+        case FieldType.PHONE:
+            return '260px';
+        case FieldType.DATE:
+            return '200px';
+        case FieldType.BOOLEAN:
+            return '180px';
+        case FieldType.ARRAY:
+            return '320px'; // Arrays need more space for multiple values
+        case FieldType.OBJECT:
+            return '280px'; // Objects need space for structured data
+        case FieldType.TEXTAREA:
+            return '400px'; // Long text needs more space
+        case FieldType.URL:
+            return '300px'; // URLs can be long
+        case FieldType.NUMBER:
+            return '160px'; // Numbers are typically shorter
+        case FieldType.SELECT:
+            return '200px'; // Select options are usually medium length
+        case FieldType.TEXT:
+            // Fall through to check field name patterns for TEXT type
+            break;
+        default:
+            // Fall through to check field name patterns
+            break;
+    }
+
+    // PRIORITY 2: Field Name Pattern-based widths (only for TEXT and unknown types)
     if (fieldName.includes('name') || fieldName.includes('vorname') || fieldName.includes('nachname')) {
-        return '140px';
+        return '280px';
     }
 
-    // Email fields
-    if (field.type === FieldType.EMAIL || fieldName.includes('email') || fieldName.includes('mail')) {
-        return '200px';
-    }
-
-    // Phone fields
-    if (field.type === FieldType.PHONE || fieldName.includes('telefon') || fieldName.includes('phone')) {
-        return '130px';
-    }
-
-    // Date fields
-    if (field.type === FieldType.DATE || fieldName.includes('datum') || fieldName.includes('date')) {
-        return '100px';
-    }
-
-    // Boolean fields
-    if (field.type === FieldType.BOOLEAN) {
-        return '90px';
-    }
-
-    // Address fields
     if (fieldName.includes('address') || fieldName.includes('adresse')) {
-        return '180px';
+        return '360px';
     }
 
-    // Array fields
-    if (field.type === FieldType.ARRAY) {
-        return '120px';
+    if (fieldName.includes('geschlecht') || fieldName.includes('gender')) {
+        return '160px';
     }
 
-    // Textarea fields
-    if (field.type === FieldType.TEXTAREA) {
+    if (fieldName.includes('description') || fieldName.includes('beschreibung')) {
+        return '400px';
+    }
+
+    if (fieldName.includes('id') || fieldName.includes('guid')) {
         return '200px';
     }
 
     // Default
-    return '120px';
+    return '260px';
 }

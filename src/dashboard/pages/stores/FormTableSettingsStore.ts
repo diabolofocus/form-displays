@@ -333,16 +333,44 @@ export class FormTableSettingsStore {
     private getDefaultColumnWidth(field: FormField): string {
         const fieldName = field.name.toLowerCase();
 
-        if (fieldName.includes('name') || fieldName.includes('vorname')) return '140px';
-        if (field.type === FieldType.EMAIL || fieldName.includes('email')) return '200px';
-        if (field.type === FieldType.PHONE || fieldName.includes('telefon')) return '130px';
-        if (field.type === FieldType.DATE || fieldName.includes('datum')) return '100px';
-        if (field.type === FieldType.BOOLEAN) return '90px';
-        if (fieldName.includes('address') || fieldName.includes('adresse')) return '180px';
-        if (field.type === FieldType.ARRAY) return '120px';
-        if (field.type === FieldType.TEXTAREA) return '200px';
+        // PRIORITY 1: Field Type-based widths
+        switch (field.type) {
+            case FieldType.EMAIL:
+                return '400px';
+            case FieldType.PHONE:
+                return '260px';
+            case FieldType.DATE:
+                return '200px';
+            case FieldType.BOOLEAN:
+                return '180px';
+            case FieldType.ARRAY:
+                return '320px'; // Arrays need more space for multiple values
+            case FieldType.OBJECT:
+                return '280px'; // Objects need space for structured data
+            case FieldType.TEXTAREA:
+                return '400px'; // Long text needs more space
+            case FieldType.URL:
+                return '300px'; // URLs can be long
+            case FieldType.NUMBER:
+                return '160px'; // Numbers are typically shorter
+            case FieldType.SELECT:
+                return '200px'; // Select options are usually medium length
+            case FieldType.TEXT:
+                // Fall through to check field name patterns for TEXT type
+                break;
+            default:
+                // Fall through to check field name patterns
+                break;
+        }
 
-        return '120px';
+        // PRIORITY 2: Field Name Pattern-based widths (only for TEXT and unknown types)
+        if (fieldName.includes('name') || fieldName.includes('vorname')) return '280px';
+        if (fieldName.includes('address') || fieldName.includes('adresse')) return '360px';
+        if (fieldName.includes('geschlecht') || fieldName.includes('gender')) return '160px';
+        if (fieldName.includes('description') || fieldName.includes('beschreibung')) return '400px';
+        if (fieldName.includes('id') || fieldName.includes('guid')) return '200px';
+
+        return '260px';
     }
 
     updateColumnVisibility(formId: string, fieldName: string, visible: boolean) {

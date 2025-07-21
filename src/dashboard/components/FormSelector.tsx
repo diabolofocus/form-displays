@@ -45,7 +45,7 @@ export const FormSelector: React.FC<FormSelectorProps> = ({
     }));
 
     return (
-        <Box direction="horizontal" gap="SP3" align="center">
+        <Box direction="horizontal" gap="SP3">
             <Box direction="vertical" gap="SP1">
                 <Text size="tiny" color="secondary">Select form</Text>
                 <Dropdown
@@ -69,28 +69,23 @@ export const FormSelector: React.FC<FormSelectorProps> = ({
                 />
             </Box>
 
-            {selectedForm && (
-                <Box direction="horizontal" gap="SP2" align="center">
-                    <Badge skin="standard" size="small">
-                        {selectedForm.submissionCount} submissions
-                    </Badge>
+            <Box direction="horizontal" gap="SP2">
+                {selectedForm && (
+                    <Box direction="horizontal" gap="SP2" style={{ alignItems: "flex-end" }}>
+                        <Badge skin="standard" size="small">
+                            {selectedForm.submissionCount} submissions
+                        </Badge>
 
-                    <Badge skin="neutralLight" size="small">
-                        {selectedForm.fields.length} fields
-                    </Badge>
+                        <Badge skin="neutralLight" size="small">
+                            {selectedForm.fields.length} fields
+                        </Badge>
 
-                    {selectedForm.lastSubmissionDate && (
-                        <Tooltip
-                            content={`Last submission: ${formatToGermanDate(selectedForm.lastSubmissionDate)}`}
-                            placement="bottom"
-                        >
-                            <Badge skin="success" size="small">
-                                Active
-                            </Badge>
-                        </Tooltip>
-                    )}
-                </Box>
-            )}
+                        <Badge skin="success" size="small">
+                            Active
+                        </Badge>
+                    </Box>
+                )}
+            </Box>
         </Box>
     );
 };

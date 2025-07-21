@@ -14,7 +14,8 @@ import {
   MessageModalLayout,
   TextButton,
   Loader,
-  Card
+  Card,
+  Badge
 } from '@wix/design-system';
 import '@wix/design-system/styles.global.css';
 import * as Icons from '@wix/wix-ui-icons-common';
@@ -274,37 +275,8 @@ const GenericFormDashboard: React.FC = () => {
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
       <Page minWidth={950}>
         <Page.Header
-          title={
-            <Box direction="horizontal" gap="SP4" align="center">
-              <FormSelector
-                availableForms={availableForms}
-                selectedFormId={selectedFormId}
-                onFormSelect={setSelectedFormId} // useForms handles persistence internally
-                loading={loading} />
-              <Box>
-                <TextButton
-                  prefixIcon={<Icons.Hint size="20px" />}
-                  size="small"
-                  underline="always"
-                  onClick={() => setIsWhatsNewOpen(true)}
-                  skin="premium"
-                >
-                  Info
-                </TextButton>
-              </Box>
-            </Box>
-          }
-          subtitle={
-            selectedForm ? (
-              <Text size="small" color="secondary">
-                {selectedForm.fields.length} fields • {selectedForm.submissionCount} submissions
-              </Text>
-            ) : (
-              <Text size="small" color="secondary">
-                Select a form
-              </Text>
-            )
-          }
+          title="Form Submissions Dashboard"
+          subtitle="Manage and view form submissions across all your forms"
           actionsBar={
             <Box direction="horizontal" gap="SP3">
               <Button
@@ -335,41 +307,30 @@ const GenericFormDashboard: React.FC = () => {
 
         <Page.Content>
           <Box direction="vertical" gap="SP4">
-            {/* Debug Panel */}
-            {showDebug && (
-              <Card>
-                <Card.Header title="Debug Information" />
-                <Card.Content>
-                  <Box direction="vertical" gap="SP2">
-                    <Box direction="horizontal" gap="SP4">
-                      <Text size="small">Selected Form ID: {selectedFormId || 'None'}</Text>
-                      <Text size="small">Window Form ID: {typeof window !== 'undefined' ? window.wixCurrentFormId || 'None' : 'N/A'}</Text>
-                    </Box>
-                    <Box direction="horizontal" gap="SP4">
-                      <Text size="small">Available Forms: {availableForms.length}</Text>
-                      <Text size="small">Selected Form: {selectedForm?.name || 'None'}</Text>
-                    </Box>
-                    <Box direction="horizontal" gap="SP2">
-                      <Button
-                        size="small"
-                        priority="secondary"
-                        onClick={() => {
-                          console.log('Main Debug: Current state:', {
-                            selectedFormId,
-                            windowFormId: typeof window !== 'undefined' ? window.wixCurrentFormId : undefined,
-                            availableForms: availableForms.map(f => ({ id: f.formId, name: f.name })),
-                            selectedForm: selectedForm ? { id: selectedForm.formId, name: selectedForm.name } : null,
-                            allStoredSettings: typeof window !== 'undefined' ? window.wixFormDashboardSettings : undefined
-                          });
-                        }}
-                      >
-                        Log Debug Info
-                      </Button>
-                    </Box>
+            {/* Form Selector */}
+            <Card>
+              <Card.Content>
+                <Box direction="horizontal" gap="SP4" align="center" style={{ justifyContent: "space-between" }}>
+                  <FormSelector
+                    availableForms={availableForms}
+                    selectedFormId={selectedFormId}
+                    onFormSelect={setSelectedFormId}
+                    loading={loading}
+                  />
+                  <Box direction="horizontal" gap="SP2" align="center">
+                    <TextButton
+                      suffixIcon={<Icons.InfoCircle size="20px" />}
+                      size="small"
+                      underline="always"
+                      onClick={() => setIsWhatsNewOpen(true)}
+                      skin="standard"
+                    >
+                      Info
+                    </TextButton>
                   </Box>
-                </Card.Content>
-              </Card>
-            )}
+                </Box>
+              </Card.Content>
+            </Card>
 
             {/* Statistics Cards */}
             {selectedForm && selectedFormSubmissions.length > 0 && (
