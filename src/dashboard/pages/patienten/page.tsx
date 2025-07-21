@@ -333,7 +333,7 @@ const GenericFormDashboard: React.FC = () => {
             </Card>
 
             {/* Statistics Cards */}
-            {selectedForm && selectedFormSubmissions.length > 0 && (
+            {/* {selectedForm && selectedFormSubmissions.length > 0 && (
               <StatisticsCards
                 totalPatients={selectedFormSubmissions.length}
                 waitingTime={statistics.waitingTime}
@@ -342,7 +342,7 @@ const GenericFormDashboard: React.FC = () => {
                 currentTime={currentTime}
                 currentDate={currentDate}
               />
-            )}
+            )} */}
 
             {/* Main Content */}
             {selectedForm ? (
@@ -353,6 +353,7 @@ const GenericFormDashboard: React.FC = () => {
                 visibleColumns={visibleColumns}
                 columnSettings={tableSettings?.columns || []}
                 formId={selectedFormId}
+                formName={selectedForm.name}
                 onViewSubmission={handleViewSubmission}
                 onPrintSubmission={handlePrintSubmission}
                 onDeleteSubmission={handleDeleteSubmission}

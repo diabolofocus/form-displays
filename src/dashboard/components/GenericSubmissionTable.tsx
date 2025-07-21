@@ -18,7 +18,8 @@ import {
     TextButton,
     TagList,
     Table,
-    Tooltip
+    Tooltip,
+    Heading
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { GenericSubmission, FormField, FieldType } from '../types';
@@ -30,6 +31,7 @@ interface GenericSubmissionTableProps {
     visibleColumns: FormField[];
     columnSettings?: any[]; // Add column settings with width info
     formId: string | null;
+    formName?: string; // Add form name prop
     onViewSubmission: (submission: GenericSubmission) => void;
     onPrintSubmission: (submission: GenericSubmission) => void;
     onDeleteSubmission: (submissionId: string) => void;
@@ -47,6 +49,7 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     visibleColumns, // Use this instead of calculating internally
     columnSettings,
     formId,
+    formName,
     onViewSubmission,
     onPrintSubmission,
     onDeleteSubmission,
@@ -330,6 +333,13 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                 >
                     <TableToolbar>
                         <TableToolbar.ItemGroup position="start">
+                            {formName && (
+                                <TableToolbar.Item>
+                                    <Heading size="medium" weight="bold">
+                                        {formName}
+                                    </Heading>
+                                </TableToolbar.Item>
+                            )}
                             <TableToolbar.Item>
                                 <Text size="medium" weight="normal">
                                     {filteredSubmissions.length !== totalSubmissions
