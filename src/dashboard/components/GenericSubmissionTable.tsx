@@ -251,12 +251,12 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                     }
                     
                     .media-gallery-tooltip::-webkit-scrollbar-thumb {
-                        background: #c1c1c1;
+                        background: #afc9fa;
                         border-radius: 3px;
                     }
                     
                     .media-gallery-tooltip::-webkit-scrollbar-thumb:hover {
-                        background: #a8a8a8;
+                        background: #2c60de;
                     }
 
                     [data-hook="tooltip-content"] {

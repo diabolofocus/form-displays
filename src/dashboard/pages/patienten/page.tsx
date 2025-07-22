@@ -34,6 +34,8 @@ import { submissions } from '@wix/forms';
 import { GenericSubmission, PatientSubmission } from '../../types';
 import { useFormTableSettings } from '../../hooks/useFormTableSettings';
 import { useFilterSettings } from '../../hooks/useFilterSettings';
+import { useAnalyticsSettings } from '../../hooks/useAnalyticsSettings';
+import { AnalyticsCards } from '../../components/AnalyticsCards';
 import { FilterValue } from '../../components/GenericFilterPanel';
 import { observer } from 'mobx-react-lite';
 
@@ -88,6 +90,10 @@ const GenericFormDashboard: React.FC = () => {
   const {
     visibleFilters
   } = useFilterSettings(selectedFormId, selectedForm?.fields || []);
+
+  const {
+    visibleAnalytics
+  } = useAnalyticsSettings(selectedFormId, selectedForm?.fields || []);
 
   // Apply filters to submissions
   const filteredSubmissions = useMemo(() => {
@@ -380,17 +386,16 @@ const GenericFormDashboard: React.FC = () => {
                 </Card.Content>
               </Card>
 
-              {/* Statistics Cards */}
-              {/* {selectedForm && filteredSubmissions.length > 0 && (
-              <StatisticsCards
-                totalPatients={filteredSubmissions.length}
-                waitingTime={statistics.waitingTime}
-                ageGroups={statistics.ageGroups}
-                genderGroups={statistics.genderGroups}
-                currentTime={currentTime}
-                currentDate={currentDate}
-              />
-            )} */}
+              {/* Analytics Cards */}
+              {selectedForm && filteredSubmissions.length > 0 && visibleAnalytics.length > 0 && (
+                <AnalyticsCards
+                  submissions={filteredSubmissions}
+                  formFields={selectedForm.fields}
+                  visibleAnalytics={visibleAnalytics}
+                  formName={selectedForm.name}
+                  isLoading={loading}
+                />
+              )}
 
               {/* Main Content */}
               {selectedForm ? (

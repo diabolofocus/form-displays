@@ -31,6 +31,7 @@ import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
 import { useFormTableSettings } from '../../hooks/useFormTableSettings';
 import { useFilterSettings } from '../../hooks/useFilterSettings';
+import { useAnalyticsSettings } from '../../hooks/useAnalyticsSettings';
 import { ColumnSetting, formTableSettingsStore } from '../stores/FormTableSettingsStore';
 import { FilterSetting, filterSettingsStore } from '../stores/FilterSettingsStore';
 import { useForms } from '../../hooks/useForms';
@@ -45,7 +46,7 @@ const SettingsPage: React.FC = () => {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isEditingFormName, setIsEditingFormName] = useState(false);
-  const [activeTab, setActiveTab] = useState(1); // 1 = Columns, 2 = Filters
+  const [activeTab, setActiveTab] = useState(1); // 1 = Columns, 2 = Filters, 3 = Analytics
 
   // Get forms and data
   const { allSubmissions, loading: dataLoading } = usePatientData();
@@ -74,6 +75,17 @@ const SettingsPage: React.FC = () => {
     resetToDefaults: resetFiltersToDefaults,
     saveSettingsExplicitly: saveFilterSettings
   } = useFilterSettings(selectedFormId, selectedForm?.fields || []);
+
+  // Analytics settings
+  const {
+    analyticsSettings,
+    visibleAnalytics,
+    isLoading: analyticsLoading,
+    updateAnalyticVisibility,
+    updateAnalyticOrder,
+    resetToDefaults: resetAnalyticsToDefaults,
+    saveSettingsExplicitly: saveAnalyticsSettings
+  } = useAnalyticsSettings(selectedFormId, selectedForm?.fields || []);
 
   // Table headers for columns
   const [columnHeaderOptions] = useState([
@@ -125,6 +137,34 @@ const SettingsPage: React.FC = () => {
     }
   ]);
 
+  // Table headers for analytics
+  const [analyticsHeaderOptions] = useState([
+    {
+      value: 'Analytics Name',
+      width: '4fr',
+      sortable: false,
+      align: 'left' as const,
+    },
+    {
+      value: 'Type',
+      width: '2fr',
+      sortable: false,
+      align: 'left' as const,
+    },
+    {
+      value: 'Chart',
+      width: '2fr',
+      sortable: false,
+      align: 'left' as const,
+    },
+    {
+      value: 'Visible',
+      width: '1fr',
+      sortable: false,
+      align: 'left' as const,
+    }
+  ]);
+
   // Convert settings to table data
   const columnTableData = settings ? settings.columns.map((column, index) => ({
     id: column.id,
@@ -145,6 +185,16 @@ const SettingsPage: React.FC = () => {
     label: filter.label,
     type: filter.type,
     visible: filter.visible
+  })) : [];
+
+  const analyticsTableData = analyticsSettings ? analyticsSettings.analytics.map((analytic, index) => ({
+    id: analytic.id,
+    analytic,
+    order: index,
+    label: analytic.label,
+    type: analytic.type,
+    chartType: analytic.chartType,
+    visible: analytic.visible
   })) : [];
 
   // Select all functionality for columns
@@ -191,6 +241,28 @@ const SettingsPage: React.FC = () => {
     });
   };
 
+  // Select all functionality for analytics
+  const allAnalyticsVisible = analyticsSettings ? analyticsSettings.analytics.every(analytic => analytic.visible) : false;
+  const someAnalyticsVisible = analyticsSettings ? analyticsSettings.analytics.some(analytic => analytic.visible) : false;
+
+  const getAnalyticsCheckboxState = () => {
+    if (allAnalyticsVisible) return 'checked';
+    if (someAnalyticsVisible) return 'indeterminate';
+    return 'normal';
+  };
+
+  const handleSelectAllAnalytics = () => {
+    if (!analyticsSettings) return;
+    const newVisible = !allAnalyticsVisible;
+    analyticsSettings.analytics.forEach(analytic => {
+      updateAnalyticVisibility(analytic.id, newVisible);
+    });
+    dashboard.showToast({
+      message: newVisible ? 'All analytics shown' : 'All analytics hidden',
+      type: 'success',
+    });
+  };
+
   const handleColumnDrop = ({ removedIndex, addedIndex }: { removedIndex: number; addedIndex: number }) => {
     if (!settings) return;
     const reorderedColumns = [...settings.columns];
@@ -215,6 +287,18 @@ const SettingsPage: React.FC = () => {
     });
   };
 
+  const handleAnalyticDrop = ({ removedIndex, addedIndex }: { removedIndex: number; addedIndex: number }) => {
+    if (!analyticsSettings) return;
+    const reorderedAnalytics = [...analyticsSettings.analytics];
+    const [removed] = reorderedAnalytics.splice(removedIndex, 1);
+    reorderedAnalytics.splice(addedIndex, 0, removed);
+    updateAnalyticOrder(reorderedAnalytics);
+    dashboard.showToast({
+      message: 'Analytics order updated',
+      type: 'success',
+    });
+  };
+
   const handleResetToDefaults = () => {
     if (selectedFormId && selectedForm) {
       if (activeTab === 1) {
@@ -224,19 +308,25 @@ const SettingsPage: React.FC = () => {
           message: 'Column settings reset to defaults',
           type: 'success',
         });
-      } else {
+      } else if (activeTab === 2) {
         // Reset filters
         filterSettingsStore.resetFormToDefaults(selectedFormId, selectedForm.fields);
         dashboard.showToast({
           message: 'Filter settings reset to defaults',
           type: 'success',
         });
+      } else if (activeTab === 3) {
+        // Reset analytics
+        resetAnalyticsToDefaults();
+        dashboard.showToast({
+          message: 'Analytics settings reset to defaults',
+          type: 'success',
+        });
       }
     }
   };
-
   const handleSaveSettings = () => {
-    if (!settings && !filterSettings) return;
+    if (!settings && !filterSettings && !analyticsSettings) return;
 
     setIsNavigating(true);
     let success = true;
@@ -245,6 +335,8 @@ const SettingsPage: React.FC = () => {
       success = saveColumnSettings();
     } else if (activeTab === 2 && filterSettings) {
       success = saveFilterSettings();
+    } else if (activeTab === 3 && analyticsSettings) {
+      success = saveAnalyticsSettings();
     }
 
     dashboard.showToast({
@@ -443,6 +535,90 @@ const SettingsPage: React.FC = () => {
 
   const canFilterDrag = () => true;
 
+  // Render analytics item
+  const renderAnalyticsItem = (data: any) => {
+    const { isPlaceholder, item } = data;
+    if (isPlaceholder) {
+      return (
+        <div>
+          <Box
+            style={{
+              boxSizing: 'border-box',
+              width: '100%',
+              height: '50px',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '6px',
+              marginBottom: '2px',
+            }}
+          />
+        </div>
+      );
+    }
+
+    const analytic: any = item.analytic;
+    return (
+      <div>
+        <TableListItem
+          draggable
+          showDivider
+          showSelectionBorder={false}
+          checkbox
+          checked={analytic.visible}
+          onCheckboxChange={() => updateAnalyticVisibility(analytic.id, !analytic.visible)}
+          options={[
+            {
+              value: (
+                <Box direction="horizontal" gap="SP2" align="center">
+                  <Text>{analytic.label}</Text>
+                  <Badge skin="neutralLight" size="small">{getAnalyticTypeLabel(analytic.type)}</Badge>
+                </Box>
+              ),
+              width: '4fr',
+              align: 'left'
+            },
+            {
+              value: (
+                <Box direction="horizontal" gap="SP1" align="center">
+                  {getAnalyticIcon(analytic.type)}
+                  <Text size="small" color="secondary">
+                    {getAnalyticTypeLabel(analytic.type)}
+                  </Text>
+                </Box>
+              ),
+              width: '2fr',
+              align: 'left'
+            },
+            {
+              value: (
+                <Box direction="horizontal" gap="SP1" align="center">
+                  {getChartIcon(analytic.chartType)}
+                  <Text size="small" color="secondary">
+                    {getChartTypeLabel(analytic.chartType)}
+                  </Text>
+                </Box>
+              ),
+              width: '2fr',
+              align: 'left'
+            },
+            {
+              value: (
+                <Badge
+                  skin={analytic.visible ? 'success' : 'neutralLight'}
+                  size="small"
+                >
+                  {analytic.visible ? 'Visible' : 'Hidden'}
+                </Badge>
+              ),
+              width: '1fr',
+              align: 'left'
+            }
+          ]}
+        />
+      </div>
+    );
+  };
+
+  const canAnalyticsDrag = () => true;
   // Convert data to draggable items
   const columnItems = settings ? settings.columns.map((column, index) => ({
     id: column.id,
@@ -458,7 +634,14 @@ const SettingsPage: React.FC = () => {
     isHeading: false
   })) : [];
 
-  if (dataLoading || settingsLoading || filtersLoading) {
+  const analyticsItems = analyticsSettings ? analyticsSettings.analytics.map((analytic, index) => ({
+    id: analytic.id,
+    analytic,
+    order: index,
+    isHeading: false
+  })) : [];
+
+  if (dataLoading || settingsLoading || filtersLoading || analyticsLoading) {
     return (
       <WixDesignSystemProvider features={{ newColorsBranding: true }}>
         <Page>
@@ -475,6 +658,8 @@ const SettingsPage: React.FC = () => {
   const totalColumnsCount = settings?.columns.length || 0;
   const visibleFiltersCount = filterSettings?.filters.filter(filter => filter.visible).length || 0;
   const totalFiltersCount = filterSettings?.filters.length || 0;
+  const visibleAnalyticsCount = analyticsSettings?.analytics.filter(analytic => analytic.visible).length || 0;
+  const totalAnalyticsCount = analyticsSettings?.analytics.length || 0;
 
   return (
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
@@ -551,12 +736,13 @@ const SettingsPage: React.FC = () => {
                     onClick={(tab) => setActiveTab(Number(tab.id))}
                     items={[
                       { id: 1, title: 'Table Columns' },
-                      { id: 2, title: 'Filters' }
+                      { id: 2, title: 'Filters' },
+                      { id: 3, title: 'Analytics' }
                     ]}
                   />
 
                   <Table
-                    data={activeTab === 1 ? columnTableData : filterTableData as any}
+                    data={activeTab === 1 ? columnTableData : activeTab === 2 ? filterTableData : analyticsTableData as any}
                     columns={[]}
                     rowVerticalPadding="medium"
                   >
@@ -646,9 +832,9 @@ const SettingsPage: React.FC = () => {
                     <Page.Sticky>
                       <Card>
                         <TableListHeader
-                          options={activeTab === 1 ? columnHeaderOptions : filterHeaderOptions}
-                          checkboxState={activeTab === 1 ? getColumnCheckboxState() : getFilterCheckboxState()}
-                          onCheckboxChange={activeTab === 1 ? handleSelectAllColumns : handleSelectAllFilters}
+                          options={activeTab === 1 ? columnHeaderOptions : activeTab === 2 ? filterHeaderOptions : analyticsHeaderOptions}
+                          checkboxState={activeTab === 1 ? getColumnCheckboxState() : activeTab === 2 ? getFilterCheckboxState() : getAnalyticsCheckboxState()}
+                          onCheckboxChange={activeTab === 1 ? handleSelectAllColumns : activeTab === 2 ? handleSelectAllFilters : handleSelectAllAnalytics}
                           onSortChange={() => { }} // No sorting needed for settings
                         />
                       </Card>
@@ -656,19 +842,21 @@ const SettingsPage: React.FC = () => {
 
                     {/* Table Content using SortableListBase for drag and drop */}
                     <Card>
-                      {(activeTab === 1 ? columnItems : filterItems).length > 0 ? (
+                      {(activeTab === 1 ? columnItems : activeTab === 2 ? filterItems : analyticsItems).length > 0 ? (
                         <SortableListBase
-                          items={activeTab === 1 ? columnItems : filterItems}
-                          renderItem={activeTab === 1 ? renderColumnItem : renderFilterItem}
-                          onDrop={activeTab === 1 ? handleColumnDrop : handleFilterDrop}
-                          canDrag={activeTab === 1 ? canColumnDrag : canFilterDrag}
+                          items={activeTab === 1 ? columnItems : activeTab === 2 ? filterItems : analyticsItems}
+                          renderItem={activeTab === 1 ? renderColumnItem : activeTab === 2 ? renderFilterItem : renderAnalyticsItem}
+                          onDrop={activeTab === 1 ? handleColumnDrop : activeTab === 2 ? handleFilterDrop : handleAnalyticDrop}
+                          canDrag={activeTab === 1 ? canColumnDrag : activeTab === 2 ? canFilterDrag : canAnalyticsDrag}
                         />
                       ) : (
                         <Box padding="40px" textAlign="center">
                           <Text size="medium" color="secondary">
                             {activeTab === 1
                               ? "No fields available for this form"
-                              : "No filterable fields available for this form"
+                              : activeTab === 2
+                                ? "No filterable fields available for this form"
+                                : "No analytics available for this form"
                             }
                           </Text>
                         </Box>
@@ -679,7 +867,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* Settings Summary */}
                 <Card>
-                  <Card.Header title={activeTab === 1 ? "Column Summary" : "Filter Summary"} />
+                  <Card.Header title={activeTab === 1 ? "Column Summary" : activeTab === 2 ? "Filter Summary" : "Analytics Summary"} />
                   <Card.Content>
                     <Box minWidth="260px" align="left" direction="vertical" gap="SP2">
                       {activeTab === 1 ? (
@@ -699,7 +887,7 @@ const SettingsPage: React.FC = () => {
                             <Text size="small" align="bottom" weight="bold">{totalColumnsCount - visibleColumnsCount}</Text>
                           </Box>
                         </>
-                      ) : (
+                      ) : activeTab === 2 ? (
                         <>
                           <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
                             <Text align="bottom" size="small">Total Filters:</Text>
@@ -716,13 +904,30 @@ const SettingsPage: React.FC = () => {
                             <Text size="small" align="bottom" weight="bold">{totalFiltersCount - visibleFiltersCount}</Text>
                           </Box>
                         </>
+                      ) : (
+                        <>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text align="bottom" size="small">Total Analytics:</Text>
+                            <Text align="bottom" size="small" weight="bold">{totalAnalyticsCount}</Text>
+                          </Box>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text size="small">Visible Analytics:</Text>
+                            <Text size="small" align="bottom" weight="bold" color={visibleAnalyticsCount > 0 ? 'success' : 'warning'}>
+                              {visibleAnalyticsCount}
+                            </Text>
+                          </Box>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text size="small" align="bottom">Hidden Analytics:</Text>
+                            <Text size="small" align="bottom" weight="bold">{totalAnalyticsCount - visibleAnalyticsCount}</Text>
+                          </Box>
+                        </>
                       )}
 
-                      {(activeTab === 1 ? settings : filterSettings)?.lastUpdated && (
+                      {(activeTab === 1 ? settings : activeTab === 2 ? filterSettings : analyticsSettings)?.lastUpdated && (
                         <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
                           <Text size="small" align="bottom">Last Updated:</Text>
                           <Text size="small" align="bottom" weight="bold" color="secondary">
-                            {new Date((activeTab === 1 ? settings : filterSettings)!.lastUpdated).toLocaleDateString()}
+                            {new Date((activeTab === 1 ? settings : activeTab === 2 ? filterSettings : analyticsSettings)!.lastUpdated).toLocaleDateString()}
                           </Text>
                         </Box>
                       )}
@@ -788,6 +993,7 @@ function getFieldTypeIcon(type: FieldType): React.ReactNode {
   }
 }
 
+
 function getFieldTypeLabel(type: FieldType): string {
   switch (type) {
     case FieldType.EMAIL:
@@ -812,6 +1018,74 @@ function getFieldTypeLabel(type: FieldType): string {
       return 'Text';
     default:
       return 'Unknown';
+  }
+}
+
+function getAnalyticTypeLabel(type: string): string {
+  switch (type) {
+    case 'total_submissions':
+      return 'Total';
+    case 'submissions_over_time':
+      return 'Timeline';
+    case 'field_distribution':
+      return 'Distribution';
+    case 'field_stats':
+      return 'Statistics';
+    case 'top_values':
+      return 'Top Values';
+    case 'completion_rate':
+      return 'Completion';
+    default:
+      return 'Analytics';
+  }
+}
+
+function getAnalyticIcon(type: string): React.ReactNode {
+  switch (type) {
+    case 'total_submissions':
+      return <Icons.Number size="16px" />;
+    case 'submissions_over_time':
+      return <Icons.Date size="16px" />;
+    case 'field_distribution':
+      return <Icons.Statistics size="16px" />;
+    case 'field_stats':
+      return <Icons.StatisticsHorizontal size="16px" />;
+    case 'top_values':
+      return <Icons.List size="16px" />;
+    case 'completion_rate':
+      return <Icons.StatisticsHorizontal size="16px" />;
+    default:
+      return <Icons.Statistics size="16px" />;
+  }
+}
+
+function getChartTypeLabel(chartType?: string): string {
+  switch (chartType) {
+    case 'pie':
+      return 'Pie Chart';
+    case 'bar':
+      return 'Bar Chart';
+    case 'line':
+      return 'Line Chart';
+    case 'stat_card':
+      return 'Stat Card';
+    default:
+      return 'Chart';
+  }
+}
+
+function getChartIcon(chartType?: string): React.ReactNode {
+  switch (chartType) {
+    case 'pie':
+      return <Icons.PieChart size="16px" />;
+    case 'bar':
+      return <Icons.BarChartSplit size="16px" />;
+    case 'line':
+      return <Icons.LineChart size="16px" />;
+    case 'stat_card':
+      return <Icons.Statistics size="16px" />;
+    default:
+      return <Icons.Statistics size="16px" />;
   }
 }
 
