@@ -81,6 +81,8 @@ export const FilterSidePanel: React.FC<FilterSidePanelProps> = ({
     if (!isOpen) return null;
 
     return (
+
+
         <div
             style={{
                 position: 'fixed',

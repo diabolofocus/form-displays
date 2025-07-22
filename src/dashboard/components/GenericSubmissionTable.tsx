@@ -380,7 +380,7 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                         })()} columns shown
                                     </Badge>
                                     {activeFiltersCount > 0 && (
-                                        <Badge skin="premium" size="small">
+                                        <Badge skin="standard" size="small">
                                             {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} active
                                         </Badge>
                                     )}
@@ -394,9 +394,9 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                     prefixIcon={<Icons.ContentFilterSmall />}
                                     priority="secondary"
                                     size="small"
-                                    skin={activeFiltersCount > 0 ? 'premium' : 'standard'}
+                                    skin={activeFiltersCount > 0 ? 'standard' : 'standard'}
                                 >
-                                    Filters
+                                    {activeFiltersCount > 0 ? `Filters (${activeFiltersCount})` : 'Filters'}
                                 </Button>
                             </TableToolbar.Item>
                             <TableToolbar.Item>
@@ -424,23 +424,16 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                         }))}
                                         size="small"
                                         maxVisibleTags={5}
+                                        actionButton={{
+                                            label: 'Clear All',
+                                            onClick: onClearAllFilters
+                                        }}
                                         onTagRemove={(tagId) => {
                                             if (onRemoveFilter) {
                                                 onRemoveFilter(tagId);
                                             }
                                         }}
                                     />
-                                </TableToolbar.Item>
-                            </TableToolbar.ItemGroup>
-                            <TableToolbar.ItemGroup position="end">
-                                <TableToolbar.Item>
-                                    <TextButton
-                                        size="small"
-                                        onClick={onClearAllFilters}
-                                        skin="destructive"
-                                    >
-                                        Clear All
-                                    </TextButton>
                                 </TableToolbar.Item>
                             </TableToolbar.ItemGroup>
                         </Table.SubToolbar>

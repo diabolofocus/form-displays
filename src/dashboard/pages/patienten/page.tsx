@@ -301,41 +301,23 @@ const GenericFormDashboard: React.FC = () => {
 
   const handleApplyFilters = (filters: FilterValue[]) => {
     setActiveFilters(filters);
-    dashboard.showToast({
-      message: getFilterSummary(filters),
-      type: 'success',
-    });
+
   };
 
   const handleClearAllFilters = () => {
     setActiveFilters([]);
-    dashboard.showToast({
-      message: 'All filters cleared',
-      type: 'success',
-    });
   };
 
   const handleRemoveFilter = (fieldName: string) => {
     const newFilters = activeFilters.filter(filter => filter.fieldName !== fieldName);
     setActiveFilters(newFilters);
-    dashboard.showToast({
-      message: `Filter "${fieldName}" removed`,
-      type: 'success',
-    });
-  };
-
-
-  const getFilterButtonText = () => {
-    if (activeFilters.length === 0) return 'Filters';
-    if (activeFilters.length === 1) return '1 Filter';
-    return `${activeFilters.length} Filters`;
   };
 
   return (
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
       <Page minWidth={950}>
         <Page.Header
-          title="Form Submissions Dashboard"
+          title="Form Dashboard"
           subtitle="Manage and view form submissions across all your forms"
           actionsBar={
             <Box direction="horizontal" gap="SP3">
@@ -378,20 +360,6 @@ const GenericFormDashboard: React.FC = () => {
                     loading={loading}
                   />
                   <Box direction="horizontal" gap="SP2" align="center">
-                    {activeFilters.length > 0 && (
-                      <Box direction="horizontal" gap="SP2" align="center">
-                        <Badge skin="primary" size="small">
-                          {getFilterSummary(activeFilters)}
-                        </Badge>
-                        <TextButton
-                          size="small"
-                          onClick={handleClearAllFilters}
-                          skin="destructive"
-                        >
-                          Clear
-                        </TextButton>
-                      </Box>
-                    )}
                     <TextButton
                       suffixIcon={<Icons.InfoCircle size="20px" />}
                       size="small"
