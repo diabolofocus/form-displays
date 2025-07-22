@@ -1,5 +1,5 @@
 // ==============================================
-// FIXED: src/dashboard/pages/patienten/page.tsx 
+// UPDATED: src/dashboard/pages/patienten/page.tsx - With Filter Integration
 // ==============================================
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -26,13 +26,15 @@ import { FormSelector } from '../../components/FormSelector';
 import { GenericSubmissionTable } from '../../components/GenericSubmissionTable';
 import { StatisticsCards } from '../../components/StatisticsCards';
 import { PatientDetailsModal } from '../../components/PatientDetailsModal';
+import { FilterSidePanel } from '../../components/FilterSidePanel';
 import { printPatientDetails } from '../../utils/printUtils';
+import { applyFilters, getFilterSummary } from '../../utils/filterUtils';
 import { submissions } from '@wix/forms';
 import { GenericSubmission, PatientSubmission } from '../../types';
-import { useFormTableSettings, withFormTableSettings } from '../../hooks/useFormTableSettings';
-
-
-
+import { useFormTableSettings } from '../../hooks/useFormTableSettings';
+import { useFilterSettings } from '../../hooks/useFilterSettings';
+import { FilterValue } from '../../components/GenericFilterPanel';
+import { observer } from 'mobx-react-lite';
 
 declare global {
   interface Window {
@@ -53,7 +55,11 @@ const GenericFormDashboard: React.FC = () => {
   const [submissionToEdit, setSubmissionToEdit] = useState<GenericSubmission | null>(null);
   const [isWhatsNewOpen, setIsWhatsNewOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showDebug, setShowDebug] = useState(true); // Set to false to hide debug panel
+  const [showDebug, setShowDebug] = useState(true);
+
+  // Filter state
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<FilterValue[]>([]);
 
   // Use the patient data hook (now returns GenericSubmission[])
   const {
@@ -77,6 +83,15 @@ const GenericFormDashboard: React.FC = () => {
     settings: tableSettings,
     visibleColumns
   } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
+
+  const {
+    visibleFilters
+  } = useFilterSettings(selectedFormId, selectedForm?.fields || []);
+
+  // Apply filters to submissions
+  const filteredSubmissions = useMemo(() => {
+    return applyFilters(selectedFormSubmissions, activeFilters);
+  }, [selectedFormSubmissions, activeFilters]);
 
   // Debug logging to ensure form ID is being passed correctly
   useEffect(() => {
@@ -116,17 +131,22 @@ const GenericFormDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate statistics based on selected form submissions
+  // Clear filters when form changes
+  useEffect(() => {
+    setActiveFilters([]);
+  }, [selectedFormId]);
+
+  // Calculate statistics based on filtered submissions
   const statistics = useMemo(() => {
     // For backward compatibility, cast to PatientSubmission for statistics
-    const patientSubmissions = selectedFormSubmissions as PatientSubmission[];
+    const patientSubmissions = filteredSubmissions as PatientSubmission[];
 
     return {
       ageGroups: calculateAgeGroups(patientSubmissions),
       genderGroups: calculateGenderGroups(patientSubmissions),
       waitingTime: { months: 7, days: 23 } // You can calculate this based on real data
     };
-  }, [selectedFormSubmissions, calculateAgeGroups, calculateGenderGroups]);
+  }, [filteredSubmissions, calculateAgeGroups, calculateGenderGroups]);
 
   if (loading) {
     return (
@@ -196,7 +216,7 @@ const GenericFormDashboard: React.FC = () => {
   const handleDeleteSubmission = (submissionId: string) => {
     console.log('handleDeleteSubmission called with ID:', submissionId);
 
-    const submission = selectedFormSubmissions.find(s => s._id === submissionId);
+    const submission = filteredSubmissions.find(s => s._id === submissionId);
     console.log('Found submission:', submission);
 
     setSubmissionToDelete(submission || null);
@@ -271,6 +291,46 @@ const GenericFormDashboard: React.FC = () => {
     });
   };
 
+  const handleOpenFilters = () => {
+    setIsFilterPanelOpen(true);
+  };
+
+  const handleCloseFilters = () => {
+    setIsFilterPanelOpen(false);
+  };
+
+  const handleApplyFilters = (filters: FilterValue[]) => {
+    setActiveFilters(filters);
+    dashboard.showToast({
+      message: getFilterSummary(filters),
+      type: 'success',
+    });
+  };
+
+  const handleClearAllFilters = () => {
+    setActiveFilters([]);
+    dashboard.showToast({
+      message: 'All filters cleared',
+      type: 'success',
+    });
+  };
+
+  const handleRemoveFilter = (fieldName: string) => {
+    const newFilters = activeFilters.filter(filter => filter.fieldName !== fieldName);
+    setActiveFilters(newFilters);
+    dashboard.showToast({
+      message: `Filter "${fieldName}" removed`,
+      type: 'success',
+    });
+  };
+
+
+  const getFilterButtonText = () => {
+    if (activeFilters.length === 0) return 'Filters';
+    if (activeFilters.length === 1) return '1 Filter';
+    return `${activeFilters.length} Filters`;
+  };
+
   return (
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
       <Page minWidth={950}>
@@ -318,6 +378,20 @@ const GenericFormDashboard: React.FC = () => {
                     loading={loading}
                   />
                   <Box direction="horizontal" gap="SP2" align="center">
+                    {activeFilters.length > 0 && (
+                      <Box direction="horizontal" gap="SP2" align="center">
+                        <Badge skin="primary" size="small">
+                          {getFilterSummary(activeFilters)}
+                        </Badge>
+                        <TextButton
+                          size="small"
+                          onClick={handleClearAllFilters}
+                          skin="destructive"
+                        >
+                          Clear
+                        </TextButton>
+                      </Box>
+                    )}
                     <TextButton
                       suffixIcon={<Icons.InfoCircle size="20px" />}
                       size="small"
@@ -333,9 +407,9 @@ const GenericFormDashboard: React.FC = () => {
             </Card>
 
             {/* Statistics Cards */}
-            {/* {selectedForm && selectedFormSubmissions.length > 0 && (
+            {/* {selectedForm && filteredSubmissions.length > 0 && (
               <StatisticsCards
-                totalPatients={selectedFormSubmissions.length}
+                totalPatients={filteredSubmissions.length}
                 waitingTime={statistics.waitingTime}
                 ageGroups={statistics.ageGroups}
                 genderGroups={statistics.genderGroups}
@@ -348,7 +422,7 @@ const GenericFormDashboard: React.FC = () => {
             {selectedForm ? (
               <GenericSubmissionTable
                 key={selectedFormId} // Force re-render when form changes
-                submissions={selectedFormSubmissions}
+                submissions={filteredSubmissions}
                 formFields={selectedForm.fields}
                 visibleColumns={visibleColumns}
                 columnSettings={tableSettings?.columns || []}
@@ -361,6 +435,12 @@ const GenericFormDashboard: React.FC = () => {
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 totalSubmissions={selectedFormSubmissions.length}
+                filteredSubmissions={filteredSubmissions.length}
+                activeFiltersCount={activeFilters.length}
+                onOpenFilters={handleOpenFilters}
+                onClearAllFilters={handleClearAllFilters}
+                onRemoveFilter={handleRemoveFilter}
+                activeFilters={activeFilters}
               />
             ) : (
               <Box
@@ -381,6 +461,19 @@ const GenericFormDashboard: React.FC = () => {
           </Box>
         </Page.Content>
       </Page>
+
+      {/* Filter Side Panel */}
+      {selectedForm && (
+        <FilterSidePanel
+          isOpen={isFilterPanelOpen}
+          onClose={handleCloseFilters}
+          formId={selectedFormId}
+          formFields={selectedForm.fields}
+          submissions={selectedFormSubmissions}
+          onFiltersApply={handleApplyFilters}
+          currentFilters={activeFilters}
+        />
+      )}
 
       {/* Modals */}
       {isModalOpen && selectedSubmission && (
@@ -438,6 +531,7 @@ const GenericFormDashboard: React.FC = () => {
               <Text>•  Generic search function across all fields</Text>
               <Text>•  Automatic type detection (email, phone, date, etc.)</Text>
               <Text>•  NEW: Table Settings - configure column visibility and order</Text>
+              <Text>•  NEW: Advanced Filters - filter by any field type</Text>
             </Box>
 
             <Box textAlign="left" marginTop="16px">
@@ -447,11 +541,13 @@ const GenericFormDashboard: React.FC = () => {
               <Text>•  Select a form from the dropdown list</Text>
               <Text>•  All form fields are automatically displayed as table columns</Text>
               <Text>•  Use "Table Settings" to hide/show columns and reorder them</Text>
+              <Text>•  Use "Filters" to filter data by any field type</Text>
               <Text>•  Search works across all text fields</Text>
               <Text>•  Click on date columns to sort</Text>
               <Text>•  Arrays displayed as tags, objects as structured data</Text>
               <Text>•  Images and files shown with previews</Text>
               <Text>•  Settings are automatically saved per form</Text>
+              <Text>•  Filters adapt to field types (text, date, number, boolean, etc.)</Text>
             </Box>
 
             <Box direction="horizontal" gap="12px" align="right" marginTop="24px">
@@ -469,4 +565,4 @@ const GenericFormDashboard: React.FC = () => {
   );
 };
 
-export default withFormTableSettings(GenericFormDashboard);
+export default observer(GenericFormDashboard);

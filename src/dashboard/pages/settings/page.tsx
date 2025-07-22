@@ -1,8 +1,9 @@
 // ==============================================
-// UPDATED: src/dashboard/pages/components/SettingsPage.tsx
+// UPDATED: src/dashboard/pages/components/SettingsPage.tsx - With Filter Settings
 // ==============================================
 
 import React, { useState, useEffect } from 'react';
+import { observer } from 'mobx-react-lite';
 import {
   Page,
   Card,
@@ -22,30 +23,35 @@ import {
   Input,
   TextButton,
   Tooltip,
-  Breadcrumbs
+  Breadcrumbs,
+  Tabs,
+  Checkbox
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { dashboard } from '@wix/dashboard';
-import { useFormTableSettings, withFormTableSettings, } from '../../hooks/useFormTableSettings';
+import { useFormTableSettings } from '../../hooks/useFormTableSettings';
+import { useFilterSettings } from '../../hooks/useFilterSettings';
 import { ColumnSetting, formTableSettingsStore } from '../stores/FormTableSettingsStore';
+import { FilterSetting, filterSettingsStore } from '../stores/FilterSettingsStore';
 import { useForms } from '../../hooks/useForms';
 import { usePatientData } from '../../hooks/usePatientData';
 import { FormSelector } from '../../components/FormSelector';
 import { FieldType } from '../../types';
 
+
 import '@wix/design-system/styles.global.css';
-import { observer } from 'mobx-react-lite';
 
 const SettingsPage: React.FC = () => {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [isEditingFormName, setIsEditingFormName] = useState(false);
-
+  const [activeTab, setActiveTab] = useState(1); // 1 = Columns, 2 = Filters
 
   // Get forms and data
   const { allSubmissions, loading: dataLoading } = usePatientData();
   const { availableForms, selectedFormId, setSelectedFormId, selectedForm } = useForms(allSubmissions);
 
+  // Table settings
   const {
     settings,
     isLoading: settingsLoading,
@@ -53,32 +59,24 @@ const SettingsPage: React.FC = () => {
     updateColumnOrder,
     updateColumnWidth,
     updateFormName,
-    resetToDefaults,
-    saveSettingsExplicitly
+    resetToDefaults: resetColumnsToDefaults,
+    saveSettingsExplicitly: saveColumnSettings
   } = useFormTableSettings(selectedFormId, selectedForm?.fields || []);
 
-  // Debug logging for settings page
-  useEffect(() => {
-    console.log('SettingsPage: Component state:', {
-      selectedFormId,
-      selectedFormName: selectedForm?.name,
-      availableFormsCount: availableForms.length,
-      windowFormId: typeof window !== 'undefined' ? window.wixCurrentFormId : 'undefined',
-      settingsExists: !!settings,
-      settingsFormId: settings?.formId
-    });
-  }, [selectedFormId, selectedForm, availableForms.length, settings]);
+  // Filter settings
+  const {
+    filterSettings,
+    visibleFilters,
+    isLoading: filtersLoading,
+    updateFilterVisibility,
+    updateFilterEnabled,
+    updateFilterOrder,
+    resetToDefaults: resetFiltersToDefaults,
+    saveSettingsExplicitly: saveFilterSettings
+  } = useFilterSettings(selectedFormId, selectedForm?.fields || []);
 
-  useEffect(() => {
-    console.log('SettingsPage: Settings changed:', {
-      formId: settings?.formId,
-      totalColumns: settings?.columns.length,
-      visibleColumns: settings?.columns.filter((c: any) => c.visible).length
-    });
-  }, [settings]);
-
-  const [headerOptions] = useState([
-
+  // Table headers for columns
+  const [columnHeaderOptions] = useState([
     {
       value: 'Field Name',
       width: '3fr',
@@ -105,8 +103,36 @@ const SettingsPage: React.FC = () => {
     }
   ]);
 
-  // Convert settings to table data for the new Table structure
-  const tableData = settings ? settings.columns.map((column, index) => ({
+  // Table headers for filters
+  const [filterHeaderOptions] = useState([
+    {
+      value: 'Filter Name',
+      width: '3fr',
+      sortable: false,
+      align: 'left' as const,
+    },
+    {
+      value: 'Type',
+      width: '2fr',
+      sortable: false,
+      align: 'left' as const,
+    },
+    {
+      value: 'Enabled',
+      width: '1fr',
+      sortable: false,
+      align: 'left' as const,
+    },
+    {
+      value: 'Visible',
+      width: '1fr',
+      sortable: false,
+      align: 'left' as const,
+    }
+  ]);
+
+  // Convert settings to table data
+  const columnTableData = settings ? settings.columns.map((column, index) => ({
     id: column.id,
     column,
     order: index,
@@ -117,161 +143,122 @@ const SettingsPage: React.FC = () => {
     width: column.width
   })) : [];
 
-  // Table columns configuration
-  const columns = [
-    {
-      title: 'Field Name',
-      render: (row: any) => (
-        <Box direction="horizontal" gap="SP2" align="center">
-          <Text>{row.column.label}</Text>
-          {row.column.fieldName === '_createdDate' && (
-            <Badge skin="neutralLight" size="small">System</Badge>
-          )}
-        </Box>
-      ),
-      width: '3fr',
-      align: 'start' as const
-    },
-    {
-      title: 'Type',
-      render: (row: any) => (
-        <Box direction="horizontal" gap="SP1" align="center">
-          {getFieldTypeIcon(row.column.type)}
-          <Text size="small" color="secondary">
-            {getFieldTypeLabel(row.column.type)}
-          </Text>
-        </Box>
-      ),
-      width: '2fr',
-      align: 'start' as const
-    },
-    {
-      title: 'Visible',
-      render: (row: any) => (
-        <Badge
-          skin={row.column.visible ? 'success' : 'neutralLight'}
-          size="small"
-        >
-          {row.column.visible ? 'Visible' : 'Hidden'}
-        </Badge>
-      ),
-      width: '1fr',
-      align: 'start' as const
-    },
-    {
-      title: 'Width',
-      render: (row: any) => (
-        <Box direction="horizontal" gap="SP1" align="center">
-          <Box width="60px">
-            <Input
-              size="small"
-              value={row.column.width ? row.column.width.replace('px', '') : ''}
-              placeholder="Auto"
-              onChange={(e) => {
-                const numericValue = e.target.value.trim();
-                const width = numericValue ? `${numericValue}px` : '';
-                updateColumnWidth(row.column.fieldName, width);
-              }}
-              onBlur={(e) => {
-                // Validate numeric input
-                const value = e.target.value.trim();
-                if (value && !value.match(/^\d+$/)) {
-                  // If invalid format, revert to previous value
-                  const currentWidth = row.column.width || '';
-                  updateColumnWidth(row.column.fieldName, currentWidth);
-                }
-              }}
-            />
-          </Box>
-          {row.column.width && row.column.width !== 'Auto' && (
-            <Text size="small" color="secondary">px</Text>
-          )}
-        </Box>
-      ),
-      width: '120px',
-      align: 'start' as const
-    }
-  ];
+  const filterTableData = filterSettings ? filterSettings.filters.map((filter, index) => ({
+    id: filter.id,
+    filter,
+    order: index,
+    fieldName: filter.fieldName,
+    label: filter.label,
+    type: filter.type,
+    visible: filter.visible,
+    enabled: filter.enabled
+  })) : [];
 
-  // Select all functionality
-  const allVisible = settings ? settings.columns.every(col => col.visible) : false;
-  const someVisible = settings ? settings.columns.some(col => col.visible) : false;
-  const noneVisible = settings ? !settings.columns.some(col => col.visible) : true;
+  // Select all functionality for columns
+  const allColumnsVisible = settings ? settings.columns.every(col => col.visible) : false;
+  const someColumnsVisible = settings ? settings.columns.some(col => col.visible) : false;
 
-  const getCheckboxState = () => {
-    if (allVisible) return 'checked';
-    if (someVisible) return 'indeterminate';
+  const getColumnCheckboxState = () => {
+    if (allColumnsVisible) return 'checked';
+    if (someColumnsVisible) return 'indeterminate';
     return 'normal';
   };
 
-  const handleSelectAll = () => {
+  const handleSelectAllColumns = () => {
     if (!settings) return;
-
-    const newVisibility = !allVisible;
-
-    // Update all columns visibility
+    const newVisibility = !allColumnsVisible;
     settings.columns.forEach(column => {
       updateColumnVisibility(column.fieldName, newVisibility);
     });
-
     dashboard.showToast({
       message: newVisibility ? 'All columns selected' : 'All columns deselected',
       type: 'success',
     });
   };
 
-  const handleDrop = ({ removedIndex, addedIndex }: { removedIndex: number; addedIndex: number }) => {
-    if (!settings) return;
+  // Select all functionality for filters
+  const allFiltersEnabled = filterSettings ? filterSettings.filters.every(filter => filter.enabled) : false;
+  const someFiltersEnabled = filterSettings ? filterSettings.filters.some(filter => filter.enabled) : false;
 
+  const getFilterCheckboxState = () => {
+    if (allFiltersEnabled) return 'checked';
+    if (someFiltersEnabled) return 'indeterminate';
+    return 'normal';
+  };
+
+  const handleSelectAllFilters = () => {
+    if (!filterSettings) return;
+    const newEnabled = !allFiltersEnabled;
+    filterSettings.filters.forEach(filter => {
+      updateFilterEnabled(filter.fieldName, newEnabled);
+    });
+    dashboard.showToast({
+      message: newEnabled ? 'All filters enabled' : 'All filters disabled',
+      type: 'success',
+    });
+  };
+
+  const handleColumnDrop = ({ removedIndex, addedIndex }: { removedIndex: number; addedIndex: number }) => {
+    if (!settings) return;
     const reorderedColumns = [...settings.columns];
     const [removed] = reorderedColumns.splice(removedIndex, 1);
     reorderedColumns.splice(addedIndex, 0, removed);
-
     updateColumnOrder(reorderedColumns);
-
     dashboard.showToast({
       message: 'Column order updated',
       type: 'success',
     });
   };
 
-  const handleVisibilityChange = (fieldName: string, visible: boolean) => {
-    updateColumnVisibility(fieldName, visible);
-
+  const handleFilterDrop = ({ removedIndex, addedIndex }: { removedIndex: number; addedIndex: number }) => {
+    if (!filterSettings) return;
+    const reorderedFilters = [...filterSettings.filters];
+    const [removed] = reorderedFilters.splice(removedIndex, 1);
+    reorderedFilters.splice(addedIndex, 0, removed);
+    updateFilterOrder(reorderedFilters);
     dashboard.showToast({
-      message: `Column ${visible ? 'shown' : 'hidden'}`,
+      message: 'Filter order updated',
       type: 'success',
     });
   };
 
   const handleResetToDefaults = () => {
     if (selectedFormId && selectedForm) {
-      console.log('SettingsPage: Reset to Defaults button clicked - executing reset');
-      formTableSettingsStore.resetFormToDefaults(selectedFormId, selectedForm.fields);
-      console.log('SettingsPage: Reset completed, visible columns:', formTableSettingsStore.getVisibleColumns(selectedFormId).length);
-
-      dashboard.showToast({
-        message: 'Settings reset to defaults - all columns are now visible',
-        type: 'success',
-      });
-    } else {
-      console.warn('Cannot reset - no form selected');
+      if (activeTab === 1) {
+        // Reset columns
+        formTableSettingsStore.resetFormToDefaults(selectedFormId, selectedForm.fields);
+        dashboard.showToast({
+          message: 'Column settings reset to defaults',
+          type: 'success',
+        });
+      } else {
+        // Reset filters
+        filterSettingsStore.resetFormToDefaults(selectedFormId, selectedForm.fields);
+        dashboard.showToast({
+          message: 'Filter settings reset to defaults',
+          type: 'success',
+        });
+      }
     }
   };
 
   const handleSaveSettings = () => {
-    if (!settings) return;
+    if (!settings && !filterSettings) return;
 
     setIsNavigating(true);
+    let success = true;
 
-    const success = saveSettingsExplicitly();
+    if (activeTab === 1 && settings) {
+      success = saveColumnSettings();
+    } else if (activeTab === 2 && filterSettings) {
+      success = saveFilterSettings();
+    }
 
     dashboard.showToast({
       message: success ? 'Settings saved successfully' : 'Error saving settings',
       type: success ? 'success' : 'error',
     });
 
-    // Navigate back to main page after successful save
     if (success) {
       setTimeout(() => {
         dashboard.navigate({
@@ -289,9 +276,9 @@ const SettingsPage: React.FC = () => {
     });
   };
 
-  const renderItem = (data: any) => {
+  // Render column item
+  const renderColumnItem = (data: any) => {
     const { isPlaceholder, item } = data;
-
     if (isPlaceholder) {
       return (
         <div>
@@ -310,7 +297,6 @@ const SettingsPage: React.FC = () => {
     }
 
     const column: any = item.column;
-
     return (
       <div>
         <TableListItem
@@ -319,11 +305,11 @@ const SettingsPage: React.FC = () => {
           showSelectionBorder={false}
           checkbox
           checked={column.visible}
-          onCheckboxChange={() => handleVisibilityChange(column.fieldName, !column.visible)}
+          onCheckboxChange={() => updateColumnVisibility(column.fieldName, !column.visible)}
           options={[
             {
               value: (
-                <Box direction="horizontal" gap="SP2" align="left">
+                <Box direction="horizontal" gap="SP2" align="center">
                   <Text>{column.label}</Text>
                   {column.fieldName === '_createdDate' && (
                     <Badge skin="neutralLight" size="small">System</Badge>
@@ -335,7 +321,7 @@ const SettingsPage: React.FC = () => {
             },
             {
               value: (
-                <Box direction="horizontal" gap="SP1" align="left">
+                <Box direction="horizontal" gap="SP1" align="center">
                   {getFieldTypeIcon(column.type)}
                   <Text size="small" color="secondary">
                     {getFieldTypeLabel(column.type)}
@@ -370,15 +356,6 @@ const SettingsPage: React.FC = () => {
                         const width = numericValue ? `${numericValue}px` : '';
                         updateColumnWidth(column.fieldName, width);
                       }}
-                      onBlur={(e) => {
-                        // Validate numeric input
-                        const value = e.target.value.trim();
-                        if (value && !value.match(/^\d+$/)) {
-                          // If invalid format, revert to previous value
-                          const currentWidth = column.width || '';
-                          updateColumnWidth(column.fieldName, currentWidth);
-                        }
-                      }}
                     />
                   </Box>
                   {column.width && column.width !== 'Auto' && (
@@ -395,21 +372,111 @@ const SettingsPage: React.FC = () => {
     );
   };
 
-  const canDrag = (data: any) => {
+  // Render filter item
+  const renderFilterItem = (data: any) => {
+    const { isPlaceholder, item } = data;
+    if (isPlaceholder) {
+      return (
+        <div>
+          <Box
+            style={{
+              boxSizing: 'border-box',
+              width: '100%',
+              height: '50px',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '6px',
+              marginBottom: '2px',
+            }}
+          />
+        </div>
+      );
+    }
+
+    const filter: any = item.filter;
+    return (
+      <div>
+        <TableListItem
+          draggable
+          showDivider
+          showSelectionBorder={false}
+          checkbox
+          checked={filter.enabled}
+          onCheckboxChange={() => updateFilterEnabled(filter.fieldName, !filter.enabled)}
+          options={[
+            {
+              value: (
+                <Box direction="horizontal" gap="SP2" align="center">
+                  <Text>{filter.label}</Text>
+                  <Badge skin="neutralLight" size="small">Filter</Badge>
+                </Box>
+              ),
+              width: '3fr',
+              align: 'left'
+            },
+            {
+              value: (
+                <Box direction="horizontal" gap="SP1" align="center">
+                  {getFieldTypeIcon(filter.type)}
+                  <Text size="small" color="secondary">
+                    {getFieldTypeLabel(filter.type)}
+                  </Text>
+                </Box>
+              ),
+              width: '2fr',
+              align: 'left'
+            },
+            {
+              value: (
+                <Badge
+                  skin={filter.enabled ? 'success' : 'neutralLight'}
+                  size="small"
+                >
+                  {filter.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+              ),
+              width: '1fr',
+              align: 'left'
+            },
+            {
+              value: (
+                <Checkbox
+                  size="small"
+                  checked={filter.visible}
+                  onChange={() => updateFilterVisibility(filter.fieldName, !filter.visible)}
+                />
+              ),
+              width: '1fr',
+              align: 'left'
+            }
+          ]}
+        />
+      </div>
+    );
+  };
+
+  const canColumnDrag = (data: any) => {
     const { item } = data;
-    // Allow dragging all items except system fields like _createdDate
     return item.column.fieldName !== '_createdDate';
   };
 
-  // Convert settings to draggable items for SortableListBase
-  const items = settings ? settings.columns.map((column, index) => ({
+  const canFilterDrag = () => true;
+
+  // Convert data to draggable items
+  const columnItems = settings ? settings.columns.map((column, index) => ({
     id: column.id,
     column,
     order: index,
     isHeading: false
   })) : [];
 
-  if (dataLoading || settingsLoading) {
+  const filterItems = filterSettings ? filterSettings.filters.map((filter, index) => ({
+    id: filter.id,
+    filter,
+    order: index,
+    isHeading: false
+  })) : [];
+
+  if (dataLoading || settingsLoading || filtersLoading) {
     return (
       <WixDesignSystemProvider features={{ newColorsBranding: true }}>
         <Page>
@@ -424,13 +491,15 @@ const SettingsPage: React.FC = () => {
 
   const visibleColumnsCount = settings?.columns.filter(col => col.visible).length || 0;
   const totalColumnsCount = settings?.columns.length || 0;
+  const enabledFiltersCount = filterSettings?.filters.filter(filter => filter.enabled).length || 0;
+  const totalFiltersCount = filterSettings?.filters.length || 0;
 
   return (
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
       <Page minWidth={950}>
         <Page.Header
           title="Table Settings"
-          subtitle="Configure which columns to display and their order"
+          subtitle="Configure table columns and filters"
           showBackButton
           onBackClicked={handleBackToDashboard}
           breadcrumbs={
@@ -467,7 +536,7 @@ const SettingsPage: React.FC = () => {
                 onClick={handleSaveSettings}
                 priority="primary"
                 prefixIcon={<Icons.Confirm />}
-                disabled={!selectedForm || !settings || isNavigating}
+                disabled={!selectedForm || (!settings && !filterSettings) || isNavigating}
               >
                 {isNavigating ? 'Saving...' : 'Save Settings'}
               </Button>
@@ -477,7 +546,7 @@ const SettingsPage: React.FC = () => {
 
         <Page.Content>
           <Box direction="vertical" align="left" gap="SP4">
-            {/* Form Selector and Name Editor */}
+            {/* Form Selector */}
             <Box direction="vertical" align="left" gap="SP4" width="100%" backgroundColor="white" borderRadius="8px">
               <Card>
                 <Card.Content>
@@ -493,9 +562,22 @@ const SettingsPage: React.FC = () => {
 
             {selectedForm ? (
               <Box direction="horizontal" align="left" gap="SP4" width="100%" borderRadius="8px">
-
                 <Card hideOverflow>
-                  <Table data={tableData} columns={columns} rowVerticalPadding="medium">
+                  {/* Tabs */}
+                  <Tabs
+                    activeId={activeTab}
+                    onClick={(tab) => setActiveTab(Number(tab.id))}
+                    items={[
+                      { id: 1, title: 'Table Columns' },
+                      { id: 2, title: 'Filters' }
+                    ]}
+                  />
+
+                  <Table
+                    data={activeTab === 1 ? columnTableData : filterTableData as any}
+                    columns={[]}
+                    rowVerticalPadding="medium"
+                  >
                     {/* Table Toolbar */}
                     <TableToolbar>
                       <TableToolbar.ItemGroup position="start">
@@ -533,7 +615,6 @@ const SettingsPage: React.FC = () => {
                                   />
                                 </Tooltip>
                               </Box>
-
                               <Button
                                 size="small"
                                 priority="secondary"
@@ -570,7 +651,10 @@ const SettingsPage: React.FC = () => {
                       <TableToolbar.ItemGroup position="end">
                         <TableToolbar.Item>
                           <Text size="small" color="secondary">
-                            {visibleColumnsCount} of {totalColumnsCount} columns visible
+                            {activeTab === 1
+                              ? `${visibleColumnsCount} of ${totalColumnsCount} columns visible`
+                              : `${enabledFiltersCount} of ${totalFiltersCount} filters enabled`
+                            }
                           </Text>
                         </TableToolbar.Item>
                       </TableToolbar.ItemGroup>
@@ -580,9 +664,9 @@ const SettingsPage: React.FC = () => {
                     <Page.Sticky>
                       <Card>
                         <TableListHeader
-                          options={headerOptions}
-                          checkboxState={getCheckboxState()}
-                          onCheckboxChange={handleSelectAll}
+                          options={activeTab === 1 ? columnHeaderOptions : filterHeaderOptions}
+                          checkboxState={activeTab === 1 ? getColumnCheckboxState() : getFilterCheckboxState()}
+                          onCheckboxChange={activeTab === 1 ? handleSelectAllColumns : handleSelectAllFilters}
                           onSortChange={() => { }} // No sorting needed for settings
                         />
                       </Card>
@@ -590,17 +674,20 @@ const SettingsPage: React.FC = () => {
 
                     {/* Table Content using SortableListBase for drag and drop */}
                     <Card>
-                      {items.length > 0 ? (
+                      {(activeTab === 1 ? columnItems : filterItems).length > 0 ? (
                         <SortableListBase
-                          items={items}
-                          renderItem={renderItem}
-                          onDrop={handleDrop}
-                          canDrag={canDrag}
+                          items={activeTab === 1 ? columnItems : filterItems}
+                          renderItem={activeTab === 1 ? renderColumnItem : renderFilterItem}
+                          onDrop={activeTab === 1 ? handleColumnDrop : handleFilterDrop}
+                          canDrag={activeTab === 1 ? canColumnDrag : canFilterDrag}
                         />
                       ) : (
                         <Box padding="40px" textAlign="center">
                           <Text size="medium" color="secondary">
-                            No fields available for this form
+                            {activeTab === 1
+                              ? "No fields available for this form"
+                              : "No filterable fields available for this form"
+                            }
                           </Text>
                         </Box>
                       )}
@@ -608,47 +695,67 @@ const SettingsPage: React.FC = () => {
                   </Table>
                 </Card>
 
-
                 {/* Settings Summary */}
-                {settings && (
-                  <Card>
-                    <Card.Header title="Form Summary" />
-                    <Card.Content>
-                      <Box minWidth="260px" align="left" direction="vertical" gap="SP2">
+                <Card>
+                  <Card.Header title={activeTab === 1 ? "Column Summary" : "Filter Summary"} />
+                  <Card.Content>
+                    <Box minWidth="260px" align="left" direction="vertical" gap="SP2">
+                      {activeTab === 1 ? (
+                        <>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text align="bottom" size="small">Total Columns:</Text>
+                            <Text align="bottom" size="small" weight="bold">{totalColumnsCount}</Text>
+                          </Box>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text size="small">Visible Columns:</Text>
+                            <Text size="small" align="bottom" weight="bold" color={visibleColumnsCount > 0 ? 'success' : 'warning'}>
+                              {visibleColumnsCount}
+                            </Text>
+                          </Box>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text size="small" align="bottom">Hidden Columns:</Text>
+                            <Text size="small" align="bottom" weight="bold">{totalColumnsCount - visibleColumnsCount}</Text>
+                          </Box>
+                        </>
+                      ) : (
+                        <>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text align="bottom" size="small">Total Filters:</Text>
+                            <Text align="bottom" size="small" weight="bold">{totalFiltersCount}</Text>
+                          </Box>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text size="small">Enabled Filters:</Text>
+                            <Text size="small" align="bottom" weight="bold" color={enabledFiltersCount > 0 ? 'success' : 'warning'}>
+                              {enabledFiltersCount}
+                            </Text>
+                          </Box>
+                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
+                            <Text size="small" align="bottom">Disabled Filters:</Text>
+                            <Text size="small" align="bottom" weight="bold">{totalFiltersCount - enabledFiltersCount}</Text>
+                          </Box>
+                        </>
+                      )}
+
+                      {(activeTab === 1 ? settings : filterSettings)?.lastUpdated && (
                         <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                          <Text align="bottom" size="small">Total Columns:</Text>
-                          <Text align="bottom" size="small" weight="bold">{totalColumnsCount}</Text>
-                        </Box>
-                        <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                          <Text size="small">Visible Columns:</Text>
-                          <Text size="small" align="bottom" weight="bold" color={visibleColumnsCount > 0 ? 'success' : 'warning'}>
-                            {visibleColumnsCount}
+                          <Text size="small" align="bottom">Last Updated:</Text>
+                          <Text size="small" align="bottom" weight="bold" color="secondary">
+                            {new Date((activeTab === 1 ? settings : filterSettings)!.lastUpdated).toLocaleDateString()}
                           </Text>
                         </Box>
+                      )}
+
+                      {selectedForm && (
                         <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                          <Text size="small" align="bottom">Hidden Columns:</Text>
-                          <Text size="small" align="bottom" weight="bold">{totalColumnsCount - visibleColumnsCount}</Text>
+                          <Text size="small" align="bottom">Form:</Text>
+                          <Text size="small" align="bottom" weight="bold" color="secondary">
+                            {selectedForm.name}
+                          </Text>
                         </Box>
-                        {settings.lastUpdated && (
-                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                            <Text size="small" align="bottom">Last Updated:</Text>
-                            <Text size="small" align="bottom" weight="bold" color="secondary">
-                              {new Date(settings.lastUpdated).toLocaleDateString()}
-                            </Text>
-                          </Box>
-                        )}
-                        {selectedForm && (
-                          <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                            <Text size="small" align="bottom">Form:</Text>
-                            <Text size="small" align="bottom" weight="bold" color="secondary">
-                              {selectedForm.name}
-                            </Text>
-                          </Box>
-                        )}
-                      </Box>
-                    </Card.Content>
-                  </Card>
-                )}
+                      )}
+                    </Box>
+                  </Card.Content>
+                </Card>
               </Box>
             ) : (
               <Box
@@ -662,11 +769,10 @@ const SettingsPage: React.FC = () => {
                   No Form Selected
                 </Text>
                 <Text size="small" color="secondary">
-                  Choose a form from the dropdown above to configure its table settings.
+                  Choose a form from the dropdown above to configure its settings.
                 </Text>
               </Box>
             )}
-
           </Box>
         </Page.Content>
       </Page>
@@ -674,7 +780,7 @@ const SettingsPage: React.FC = () => {
   );
 };
 
-// Helper functions (unchanged)
+// Helper functions
 function getFieldTypeIcon(type: FieldType): React.ReactNode {
   switch (type) {
     case FieldType.EMAIL:
@@ -693,6 +799,8 @@ function getFieldTypeIcon(type: FieldType): React.ReactNode {
       return <Icons.ExternalLink size="16px" />;
     case FieldType.NUMBER:
       return <Icons.Number size="16px" />;
+    case FieldType.SELECT:
+      return <Icons.Dropdown size="16px" />;
     default:
       return <Icons.Text size="16px" />;
   }
@@ -716,6 +824,8 @@ function getFieldTypeLabel(type: FieldType): string {
       return 'URL';
     case FieldType.NUMBER:
       return 'Number';
+    case FieldType.SELECT:
+      return 'Select';
     case FieldType.TEXT:
       return 'Text';
     default:

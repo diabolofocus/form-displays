@@ -1,5 +1,5 @@
 // ==============================================
-// FIXED: src/dashboard/components/FilterPanel.tsx
+// FIXED: src/dashboard/components/GenericFilterPanel.tsx
 // ==============================================
 
 import React, { useState, useEffect } from 'react';
@@ -13,19 +13,25 @@ import {
     DatePicker,
     Range,
     Checkbox,
+    Slider,
     FormField,
     TextButton,
     Accordion,
     accordionItemBuilder,
     Badge,
     IconButton,
-    Card,
     MultiSelect
 } from '@wix/design-system';
 import * as Icons from '@wix/wix-ui-icons-common';
 import { FormField as FormFieldType, FieldType, GenericSubmission } from '../types';
-import { FilterOperator, FilterValue } from './GenericFilterPanel';
 
+export type FilterOperator = 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'greaterThan' | 'lessThan' | 'between' | 'in' | 'exists';
+
+export interface FilterValue {
+    fieldName: string;
+    value: any;
+    operator?: FilterOperator;
+}
 
 
 // Type guard function to check if a string is a valid FilterOperator
@@ -37,27 +43,24 @@ const isValidFilterOperator = (value: string): value is FilterOperator => {
     return validOperators.includes(value as FilterOperator);
 };
 
-interface FilterPanelProps {
+export interface GenericFilterPanelProps {
     availableFilters: FormFieldType[];
     activeFilters: FilterValue[];
     onFiltersChange: (filters: FilterValue[]) => void;
     onClearAll: () => void;
-    submissions: GenericSubmission[];
-    title?: string;
-    showHeader?: boolean;
-    compact?: boolean;
+    submissions: GenericSubmission[]; // For generating filter options
 }
 
-export const FilterPanel: React.FC<FilterPanelProps> = ({
+export const GenericFilterPanel: React.FC<GenericFilterPanelProps> = ({
     availableFilters,
     activeFilters,
     onFiltersChange,
     onClearAll,
-    submissions,
-    title = "Filters",
-    showHeader = true,
-    compact = false
+    submissions
 }) => {
+    const [expandedFilters, setExpandedFilters] = useState<Set<string>>(new Set());
+    const [filterUIState, setFilterUIState] = useState<Map<string, { value: any, operator: FilterOperator }>>(new Map());
+
     // Generate unique values for each field to create filter options
     const getFieldOptions = (field: FormFieldType): Array<{ id: any, value: string }> => {
         const values = new Set<any>();
@@ -91,11 +94,19 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     };
 
     const getFilterValue = (fieldName: string): any => {
+        // First check UI state, then active filters
+        const uiState = filterUIState.get(fieldName);
+        if (uiState) return uiState.value;
+
         const filter = activeFilters.find(f => f.fieldName === fieldName);
-        return filter?.value;
+        return filter?.value || '';
     };
 
     const getFilterOperator = (fieldName: string): FilterOperator => {
+        // First check UI state, then active filters
+        const uiState = filterUIState.get(fieldName);
+        if (uiState) return uiState.operator;
+
         const filter = activeFilters.find(f => f.fieldName === fieldName);
         return filter?.operator || 'equals';
     };
@@ -105,20 +116,14 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         onFiltersChange(newFilters);
     };
 
-    const isFilterActive = (field: FormFieldType): boolean => {
-        const filter = activeFilters.find(f => f.fieldName === field.name);
-        if (!filter) return false;
-
-        // Check if there's a meaningful value
-        if (filter.value == null || filter.value === '') return false;
-        if (Array.isArray(filter.value) && filter.value.length === 0) return false;
-        if (filter.operator === 'exists') return true; // Exists filter is always meaningful
-
-        return true;
-    };
-
-    const getActiveFilterCount = () => {
-        return activeFilters.length;
+    const toggleFilterExpanded = (fieldName: string) => {
+        const newExpanded = new Set(expandedFilters);
+        if (newExpanded.has(fieldName)) {
+            newExpanded.delete(fieldName);
+        } else {
+            newExpanded.add(fieldName);
+        }
+        setExpandedFilters(newExpanded);
     };
 
     const renderTextFilter = (field: FormFieldType) => {
@@ -265,7 +270,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
                         onSelect={(option) => {
                             const operatorValue = String(option?.id);
                             if (operatorValue === 'between') {
-                                updateFilter(field.name, { min: null, max: null }, 'between');
+                                updateFilter(field.name, { from: null, to: null }, 'between');
                             } else if (isValidFilterOperator(operatorValue)) {
                                 updateFilter(field.name, value, operatorValue);
                             }
@@ -443,6 +448,22 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         }
     };
 
+    const isFilterActive = (field: FormFieldType): boolean => {
+        const filter = activeFilters.find(f => f.fieldName === field.name);
+        if (!filter) return false;
+
+        // Check if there's a meaningful value
+        if (filter.value == null || filter.value === '') return false;
+        if (Array.isArray(filter.value) && filter.value.length === 0) return false;
+        if (filter.operator === 'exists') return true; // Exists filter is always meaningful
+
+        return true;
+    };
+
+    const getActiveFilterCount = () => {
+        return activeFilters.length;
+    };
+
     const accordionItems = availableFilters.map(field =>
         accordionItemBuilder({
             title: (
@@ -478,53 +499,30 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         })
     );
 
-    if (compact) {
-        return (
-            <Box direction="vertical" gap="SP2">
-                {availableFilters.length > 0 ? (
-                    <Accordion
-                        items={accordionItems}
-                        multiple={true}
-                        skin="light"
-                        size="tiny"
-                    />
-                ) : (
-                    <Box padding="SP2" textAlign="center">
-                        <Text size="small" color="secondary">
-                            No filters available
-                        </Text>
-                    </Box>
-                )}
-            </Box>
-        );
-    }
-
     return (
         <Box direction="vertical" gap="SP3">
             {/* Header */}
-            {showHeader && (
-                <Box direction="horizontal" gap="SP2" align="center" style={{ justifyContent: 'space-between' }}>
-                    <Box direction="horizontal" gap="SP2" align="center">
-                        <Text size="medium" weight="bold">
-                            {title}
-                        </Text>
-                        {getActiveFilterCount() > 0 && (
-                            <Badge skin="primary" size="small">
-                                {getActiveFilterCount()} active
-                            </Badge>
-                        )}
-                    </Box>
+            <Box direction="horizontal" gap="SP2" align="center" style={{ justifyContent: 'space-between' }}>
+                <Box direction="horizontal" gap="SP2" align="center">
+                    <Text size="medium" weight="bold">
+                        Filters
+                    </Text>
                     {getActiveFilterCount() > 0 && (
-                        <TextButton
-                            size="small"
-                            onClick={onClearAll}
-                            skin="destructive"
-                        >
-                            Clear All
-                        </TextButton>
+                        <Badge skin="primary" size="small">
+                            {getActiveFilterCount()} active
+                        </Badge>
                     )}
                 </Box>
-            )}
+                {getActiveFilterCount() > 0 && (
+                    <TextButton
+                        size="small"
+                        onClick={onClearAll}
+                        skin="destructive"
+                    >
+                        Clear All
+                    </TextButton>
+                )}
+            </Box>
 
             {/* No filters available */}
             {availableFilters.length === 0 && (
@@ -547,6 +545,3 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
         </Box>
     );
 };
-
-// Export for backward compatibility
-export default FilterPanel;

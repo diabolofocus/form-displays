@@ -92,6 +92,3 @@ export const useFormTableSettings = (formId: string | null, formFields: FormFiel
         }
     };
 };
-
-// Export observer wrapper for components that use this hook
-export const withFormTableSettings = observer;

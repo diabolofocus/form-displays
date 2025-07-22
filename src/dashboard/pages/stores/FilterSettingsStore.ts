@@ -10,25 +10,25 @@ export interface FilterSetting {
     fieldName: string;
     label: string;
     type: FieldType;
+    enabled: boolean;
     visible: boolean;
     order: number;
-    enabled: boolean; // Whether this filter is enabled for use
 }
 
-export interface FilterFormSettings {
+export interface FilterSettings {
     formId: string;
     filters: FilterSetting[];
     lastUpdated: string;
 }
 
 class FilterSettingsStore {
-    private settings: Map<string, FilterFormSettings> = new Map();
+    formFilters = new Map<string, FilterSettings>();
     selectedFormId: string | null = null;
-    isLoading: boolean = false;
+    isLoading = false;
 
     constructor() {
         makeAutoObservable(this);
-        this.loadFromStorage();
+        this.loadSettings();
     }
 
     setSelectedFormId(formId: string) {
@@ -36,33 +36,40 @@ class FilterSettingsStore {
     }
 
     setFormFilters(formId: string, formFields: FormField[]) {
-        if (!formId || formFields.length === 0) return;
+        console.log('FilterSettingsStore: Setting up filters for form:', formId);
 
-        const existingSettings = this.settings.get(formId);
-
-        if (existingSettings) {
-            // Merge with existing settings
-            const mergedSettings = this.mergeWithCurrentFields(existingSettings, formFields);
-            this.settings.set(formId, mergedSettings);
-        } else {
-            // Create default settings
-            const defaultSettings = this.createDefaultFilterSettings(formId, formFields);
-            this.settings.set(formId, defaultSettings);
+        if (!formId || formFields.length === 0) {
+            console.warn('FilterSettingsStore: Invalid formId or empty formFields');
+            return;
         }
 
-        this.saveToStorage();
+        const existingSettings = this.formFilters.get(formId);
+
+        if (!existingSettings) {
+            // Create default filter settings
+            const defaultSettings = this.createDefaultSettings(formId, formFields);
+            this.formFilters.set(formId, defaultSettings);
+            this.saveSettings();
+            console.log('FilterSettingsStore: Created default filter settings for form:', formId);
+        } else {
+            // Merge with existing settings
+            const mergedSettings = this.mergeWithCurrentFields(existingSettings, formFields);
+            this.formFilters.set(formId, mergedSettings);
+            this.saveSettings();
+            console.log('FilterSettingsStore: Merged filter settings for form:', formId);
+        }
     }
 
-    getFormFilters(formId: string): FilterFormSettings | null {
-        return this.settings.get(formId) || null;
+    getFormFilters(formId: string): FilterSettings | null {
+        return this.formFilters.get(formId) || null;
     }
 
     getVisibleFilters(formId: string): FormField[] {
-        const filterSettings = this.settings.get(formId);
-        if (!filterSettings) return [];
+        const settings = this.formFilters.get(formId);
+        if (!settings) return [];
 
-        return filterSettings.filters
-            .filter(filter => filter.visible && filter.enabled)
+        return settings.filters
+            .filter(filter => filter.enabled && filter.visible)
             .sort((a, b) => a.order - b.order)
             .map(filter => ({
                 name: filter.fieldName,
@@ -71,99 +78,128 @@ class FilterSettingsStore {
             }));
     }
 
-    updateFilterVisibility(formId: string, fieldName: string, visible: boolean) {
-        const filterSettings = this.settings.get(formId);
-        if (!filterSettings) return;
+    updateFilterEnabled(formId: string, fieldName: string, enabled: boolean) {
+        const settings = this.formFilters.get(formId);
+        if (!settings) return;
 
-        const updatedFilters = filterSettings.filters.map(filter =>
-            filter.fieldName === fieldName ? { ...filter, visible } : filter
-        );
-
-        this.settings.set(formId, {
-            ...filterSettings,
-            filters: updatedFilters,
-            lastUpdated: new Date().toISOString()
-        });
-
-        this.saveToStorage();
+        const filter = settings.filters.find(f => f.fieldName === fieldName);
+        if (filter) {
+            filter.enabled = enabled;
+            settings.lastUpdated = new Date().toISOString();
+            this.saveSettings();
+        }
     }
 
-    updateFilterEnabled(formId: string, fieldName: string, enabled: boolean) {
-        const filterSettings = this.settings.get(formId);
-        if (!filterSettings) return;
+    updateFilterVisibility(formId: string, fieldName: string, visible: boolean) {
+        const settings = this.formFilters.get(formId);
+        if (!settings) return;
 
-        const updatedFilters = filterSettings.filters.map(filter =>
-            filter.fieldName === fieldName ? { ...filter, enabled } : filter
-        );
-
-        this.settings.set(formId, {
-            ...filterSettings,
-            filters: updatedFilters,
-            lastUpdated: new Date().toISOString()
-        });
-
-        this.saveToStorage();
+        const filter = settings.filters.find(f => f.fieldName === fieldName);
+        if (filter) {
+            filter.visible = visible;
+            settings.lastUpdated = new Date().toISOString();
+            this.saveSettings();
+        }
     }
 
     updateFilterOrder(formId: string, reorderedFilters: FilterSetting[]) {
-        const filterSettings = this.settings.get(formId);
-        if (!filterSettings) return;
+        const settings = this.formFilters.get(formId);
+        if (!settings) return;
 
-        const updatedFilters = reorderedFilters.map((filter, index) => ({
+        settings.filters = reorderedFilters.map((filter, index) => ({
             ...filter,
             order: index
         }));
-
-        this.settings.set(formId, {
-            ...filterSettings,
-            filters: updatedFilters,
-            lastUpdated: new Date().toISOString()
-        });
-
-        this.saveToStorage();
+        settings.lastUpdated = new Date().toISOString();
+        this.saveSettings();
     }
 
     resetFormToDefaults(formId: string, formFields: FormField[]) {
-        if (!formId || formFields.length === 0) return;
-
-        const defaultSettings = this.createDefaultFilterSettings(formId, formFields);
-        this.settings.set(formId, defaultSettings);
-        this.saveToStorage();
+        console.log('FilterSettingsStore: Resetting form to defaults:', formId);
+        const defaultSettings = this.createDefaultSettings(formId, formFields);
+        this.formFilters.set(formId, defaultSettings);
+        this.saveSettings();
     }
 
-    private createDefaultFilterSettings(formId: string, formFields: FormField[]): FilterFormSettings {
-        const filterSettings: FilterSetting[] = formFields
-            .filter(field => this.isFilterableFieldType(field.type))
-            .map((field, index) => ({
-                id: field.name,
-                fieldName: field.name,
-                label: field.label,
-                type: field.type,
-                visible: true,
-                order: index,
-                enabled: true
-            }));
+    saveSettings() {
+        try {
+            const settingsArray = Array.from(this.formFilters.values());
+            if (typeof window !== 'undefined') {
+                window.wixFormDashboardFilterSettings = settingsArray;
+                window.wixFormDashboardFilterSettingsBackup = JSON.stringify(settingsArray);
+                console.log('FilterSettingsStore: Settings saved to memory');
+            }
+        } catch (error) {
+            console.error('FilterSettingsStore: Error saving settings:', error);
+        }
+    }
+
+    private loadSettings() {
+        try {
+            if (typeof window !== 'undefined') {
+                // Try primary storage first
+                if (window.wixFormDashboardFilterSettings && Array.isArray(window.wixFormDashboardFilterSettings)) {
+                    const settings = window.wixFormDashboardFilterSettings;
+                    settings.forEach(setting => {
+                        this.formFilters.set(setting.formId, setting);
+                    });
+                    console.log('FilterSettingsStore: Loaded settings from primary storage');
+                    return;
+                }
+
+                // Try backup storage
+                if (window.wixFormDashboardFilterSettingsBackup) {
+                    const backupSettings = JSON.parse(window.wixFormDashboardFilterSettingsBackup);
+                    if (Array.isArray(backupSettings)) {
+                        backupSettings.forEach(setting => {
+                            this.formFilters.set(setting.formId, setting);
+                        });
+                        console.log('FilterSettingsStore: Loaded settings from backup storage');
+                        return;
+                    }
+                }
+            }
+            console.log('FilterSettingsStore: No existing settings found');
+        } catch (error) {
+            console.warn('FilterSettingsStore: Error loading settings:', error);
+        }
+    }
+
+    private createDefaultSettings(formId: string, formFields: FormField[]): FilterSettings {
+        console.log('FilterSettingsStore: Creating default filter settings for form:', formId);
+
+        const filters: FilterSetting[] = formFields.map((field, index) => ({
+            id: field.name,
+            fieldName: field.name,
+            label: field.label,
+            type: field.type,
+            enabled: this.shouldEnableByDefault(field.type),
+            visible: true,
+            order: index
+        }));
 
         return {
             formId,
-            filters: filterSettings,
+            filters,
             lastUpdated: new Date().toISOString()
         };
     }
 
-    private mergeWithCurrentFields(savedSettings: FilterFormSettings, currentFields: FormField[]): FilterFormSettings {
-        const existingFilters = new Map(savedSettings.filters.map(filter => [filter.fieldName, filter]));
+    private mergeWithCurrentFields(existingSettings: FilterSettings, currentFields: FormField[]): FilterSettings {
+        console.log('FilterSettingsStore: Merging existing settings with current fields');
 
-        // Only include filterable fields
-        const filterableFields = currentFields.filter(field => this.isFilterableFieldType(field.type));
+        const existingFilters = new Map(existingSettings.filters.map(filter => [filter.fieldName, filter]));
+        const currentFieldNames = new Set(currentFields.map(field => field.name));
 
-        const mergedFilters: FilterSetting[] = filterableFields.map((field, index) => {
+        // Process current form fields
+        const mergedFilters: FilterSetting[] = currentFields.map((field, index) => {
             const existing = existingFilters.get(field.name);
             if (existing) {
+                // Update label and type in case they changed, but keep other settings
                 return {
                     ...existing,
-                    label: field.label, // Update label in case it changed
-                    type: field.type    // Update type in case it changed
+                    label: field.label,
+                    type: field.type
                 };
             } else {
                 // New field - add with default settings
@@ -172,100 +208,51 @@ class FilterSettingsStore {
                     fieldName: field.name,
                     label: field.label,
                     type: field.type,
+                    enabled: this.shouldEnableByDefault(field.type),
                     visible: true,
-                    order: savedSettings.filters.length + index,
-                    enabled: true
+                    order: existingSettings.filters.length + index
                 };
             }
         });
 
         // Remove filters for fields that no longer exist
-        const currentFieldNames = new Set(filterableFields.map(f => f.name));
-        const validFilters = mergedFilters.filter(filter => currentFieldNames.has(filter.fieldName));
+        const validFilters = mergedFilters.filter(filter =>
+            currentFieldNames.has(filter.fieldName)
+        );
 
         // Reorder based on saved order
         validFilters.sort((a, b) => a.order - b.order);
 
         return {
-            ...savedSettings,
+            ...existingSettings,
             filters: validFilters.map((filter, index) => ({ ...filter, order: index })),
             lastUpdated: new Date().toISOString()
         };
     }
 
-    private isFilterableFieldType(type: FieldType): boolean {
-        // Exclude complex types that are hard to filter
-        const filterableTypes = [
+    private shouldEnableByDefault(fieldType: FieldType): boolean {
+        // Enable filters by default for commonly filtered field types
+        const commonlyFilteredTypes = [
             FieldType.TEXT,
             FieldType.EMAIL,
             FieldType.PHONE,
+            FieldType.SELECT,
+            FieldType.BOOLEAN,
             FieldType.DATE,
             FieldType.NUMBER,
-            FieldType.BOOLEAN,
-            FieldType.SELECT,
-            FieldType.URL
+            FieldType.ARRAY
         ];
 
-        return filterableTypes.includes(type);
-    }
-
-    saveSettings() {
-        this.saveToStorage();
-    }
-
-    private saveToStorage() {
-        if (typeof window !== 'undefined') {
-            try {
-                const settingsArray = Array.from(this.settings.values());
-                window.wixFilterDashboardSettings = [...settingsArray];
-
-                // Also store as JSON backup
-                window.wixFilterDashboardSettingsBackup = JSON.stringify(settingsArray);
-            } catch (error) {
-                console.error('FilterSettingsStore: Error saving to storage:', error);
-            }
-        }
-    }
-
-    private loadFromStorage() {
-        if (typeof window !== 'undefined') {
-            try {
-                // Try primary storage first
-                if (window.wixFilterDashboardSettings && Array.isArray(window.wixFilterDashboardSettings)) {
-                    const settings = window.wixFilterDashboardSettings;
-                    if (settings.every(s => s.formId && s.filters)) {
-                        settings.forEach(setting => {
-                            this.settings.set(setting.formId, { ...setting });
-                        });
-                        return;
-                    }
-                }
-
-                // Try backup storage
-                if (window.wixFilterDashboardSettingsBackup) {
-                    const backupSettings = JSON.parse(window.wixFilterDashboardSettingsBackup);
-                    if (Array.isArray(backupSettings) && backupSettings.every(s => s.formId && s.filters)) {
-                        backupSettings.forEach(setting => {
-                            this.settings.set(setting.formId, { ...setting });
-                        });
-                        // Restore to primary storage
-                        window.wixFilterDashboardSettings = [...backupSettings];
-                    }
-                }
-            } catch (error) {
-                console.error('FilterSettingsStore: Error loading from storage:', error);
-            }
-        }
+        return commonlyFilteredTypes.includes(fieldType);
     }
 }
 
-// Global store instance
-export const filterSettingsStore = new FilterSettingsStore();
-
-// Global interface declaration
+// Declare global types
 declare global {
     interface Window {
-        wixFilterDashboardSettings?: FilterFormSettings[];
-        wixFilterDashboardSettingsBackup?: string;
+        wixFormDashboardFilterSettings?: FilterSettings[];
+        wixFormDashboardFilterSettingsBackup?: string;
     }
 }
+
+export const filterSettingsStore = new FilterSettingsStore();

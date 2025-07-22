@@ -29,7 +29,7 @@ export const useFilterSettings = (formId: string | null, formFields: FormField[]
 
     // Get current filter settings and visible filters
     const filterSettings = formId ? filterSettingsStore.getFormFilters(formId) : null;
-    const visibleFilters = formId ? filterSettingsStore.getVisibleFilters(formId) : [];
+    const visibleFilters = formId ? filterSettingsStore.getVisibleFilters(formId) : formFields;
 
     return {
         filterSettings,
@@ -70,6 +70,3 @@ export const useFilterSettings = (formId: string | null, formFields: FormField[]
         }
     };
 };
-
-// Export observer wrapper for components that use this hook
-export const withFilterSettings = observer;

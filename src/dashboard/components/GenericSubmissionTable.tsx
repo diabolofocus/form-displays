@@ -1,8 +1,10 @@
 // ==============================================
-// FULLY FIXED: src/dashboard/pages/components/GenericSubmissionTable.tsx - Complete Fix
+// UPDATED: src/dashboard/components/GenericSubmissionTable.tsx - With Filter Support
 // ==============================================
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { observer } from 'mobx-react-lite';
+
 import {
     Button,
     Text,
@@ -29,9 +31,9 @@ interface GenericSubmissionTableProps {
     submissions: GenericSubmission[];
     formFields: FormField[];
     visibleColumns: FormField[];
-    columnSettings?: any[]; // Add column settings with width info
+    columnSettings?: any[];
     formId: string | null;
-    formName?: string; // Add form name prop
+    formName?: string;
     onViewSubmission: (submission: GenericSubmission) => void;
     onPrintSubmission: (submission: GenericSubmission) => void;
     onDeleteSubmission: (submissionId: string) => void;
@@ -39,6 +41,13 @@ interface GenericSubmissionTableProps {
     searchTerm: string;
     onSearchChange: (value: string) => void;
     totalSubmissions: number;
+    filteredSubmissions?: number; // NEW: Count after filters but before search
+    activeFiltersCount?: number; // NEW: Number of active filters
+    onOpenFilters?: () => void; // NEW: Filter button handler
+    onClearAllFilters?: () => void; // NEW: Clear filters handler
+    onRemoveFilter?: (fieldName: string) => void; // NEW: Remove individual filter
+    activeFilters?: any[]; // NEW: Active filters for SubToolbar tags
+
 }
 
 const ITEMS_PER_PAGE = 40;
@@ -46,7 +55,7 @@ const ITEMS_PER_PAGE = 40;
 export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     submissions,
     formFields,
-    visibleColumns, // Use this instead of calculating internally
+    visibleColumns,
     columnSettings,
     formId,
     formName,
@@ -57,20 +66,21 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
     searchTerm,
     onSearchChange,
     totalSubmissions,
+    filteredSubmissions,
+    activeFiltersCount = 0,
+    onOpenFilters,
+    onClearAllFilters,
+    onRemoveFilter,
+    activeFilters = [],
 }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortField, setSortField] = useState<string>('_createdDate');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-    // Simply use the passed visibleColumns
     const safeVisibleColumns = visibleColumns;
 
-    useEffect(() => {
-        // Removed console logging to reduce noise
-    }, [safeVisibleColumns]);
-
     // Filter submissions based on search term
-    const filteredSubmissions = submissions.filter(submission => {
+    const searchFilteredSubmissions = submissions.filter(submission => {
         if (!searchTerm) return true;
         const searchLower = searchTerm.toLowerCase();
 
@@ -94,12 +104,12 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
         setCurrentPage(1);
     }, [submissions.length]);
 
-    const totalPages = Math.ceil(filteredSubmissions.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(searchFilteredSubmissions.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredSubmissions.length);
+    const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, searchFilteredSubmissions.length);
 
     // Sort submissions
-    const sortedSubmissions = [...filteredSubmissions].sort((a, b) => {
+    const sortedSubmissions = [...searchFilteredSubmissions].sort((a, b) => {
         let aValue = getSortValue(a, sortField);
         let bValue = getSortValue(b, sortField);
 
@@ -132,7 +142,29 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
         return getDefaultColumnWidth(field, index);
     };
 
+    // Generate submission count text
+    const getSubmissionCountText = () => {
+        const hasFilters = activeFiltersCount > 0;
+        const hasSearch = searchTerm && searchTerm.trim() !== '';
+
+        if (!hasFilters && !hasSearch) {
+            return `${totalSubmissions} Submissions`;
+        }
+
+        if (hasFilters && !hasSearch) {
+            return `${submissions.length} of ${totalSubmissions} Submissions`;
+        }
+
+        if (!hasFilters && hasSearch) {
+            return `${searchFilteredSubmissions.length} of ${totalSubmissions} Submissions`;
+        }
+
+        // Both filters and search active
+        return `${searchFilteredSubmissions.length} of ${totalSubmissions} Submissions`;
+    };
+
     const hasNoSubmissions = submissions.length === 0;
+
     return (
         <Box direction="vertical" gap="SP4">
             <Card hideOverflow>
@@ -193,7 +225,6 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         z-index: 1 !important;
                     }
 
-                    /* Keep actions column background transparent on hover */
                     [data-hook="table-cell"]:last-child {
                         background-color: transparent !important;
                     }
@@ -202,7 +233,6 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         background-color: transparent !important;
                     }
                     
-                    /* More specific selector for Wix Table actions column */
                     table tbody tr td:last-child {
                         background-color: transparent !important;
                     }
@@ -211,7 +241,6 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         background-color: transparent !important;
                     }
 
-                    /* Custom scrollbar for media gallery tooltip */
                     .media-gallery-tooltip::-webkit-scrollbar {
                         height: 6px;
                     }
@@ -230,22 +259,19 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         background: #a8a8a8;
                     }
 
-                    /* Force tooltip to be wider */
                     [data-hook="tooltip-content"] {
                         max-width: none !important;
                         min-width: 300px !important;
                         width: auto !important;
                     }
 
-                    /* Override Wix tooltip wrapper constraints */
                     [role="tooltip"] {
                         max-width: 485px !important;
                     }
-                
                 `}</style>
 
                 <Table
-                    horizontalScroll={safeVisibleColumns.length > 4} // Only use horizontal scroll when many columns
+                    horizontalScroll={safeVisibleColumns.length > 4}
                     data={currentSubmissions.map((submission, index) => ({
                         ...submission,
                         _index: index,
@@ -327,7 +353,7 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                 </div>
                             ),
                             align: 'end' as const,
-                            stickyActionCell: safeVisibleColumns.length > 4 // Only sticky when many columns
+                            stickyActionCell: safeVisibleColumns.length > 4
                         }
                     ]}
                 >
@@ -342,27 +368,37 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                             )}
                             <TableToolbar.Item>
                                 <Text size="medium" weight="normal">
-                                    {filteredSubmissions.length !== totalSubmissions
-                                        ? `${filteredSubmissions.length} of ${totalSubmissions} Submissions`
-                                        : `${totalSubmissions} Submissions`
-                                    }
+                                    {getSubmissionCountText()}
                                 </Text>
                             </TableToolbar.Item>
                             <TableToolbar.Item>
-                                {(() => {
-                                    // Count total possible columns (form fields + system fields)
-                                    const systemFields = ['_createdDate'];
-                                    const totalPossibleColumns = formFields.length + systemFields.length;
-
-                                    return (
-                                        <Badge skin="neutralLight" size="small">
-                                            {safeVisibleColumns.length} of {totalPossibleColumns} columns shown
+                                <Box direction="horizontal" gap="SP2" align="center">
+                                    <Badge skin="neutralLight" size="small">
+                                        {safeVisibleColumns.length} of {(() => {
+                                            const systemFields = ['_createdDate'];
+                                            return formFields.length + systemFields.length;
+                                        })()} columns shown
+                                    </Badge>
+                                    {activeFiltersCount > 0 && (
+                                        <Badge skin="premium" size="small">
+                                            {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} active
                                         </Badge>
-                                    );
-                                })()}
+                                    )}
+                                </Box>
                             </TableToolbar.Item>
                         </TableToolbar.ItemGroup>
                         <TableToolbar.ItemGroup position="end">
+                            <TableToolbar.Item>
+                                <Button
+                                    onClick={onOpenFilters}
+                                    prefixIcon={<Icons.ContentFilterSmall />}
+                                    priority="secondary"
+                                    size="small"
+                                    skin={activeFiltersCount > 0 ? 'premium' : 'standard'}
+                                >
+                                    Filters
+                                </Button>
+                            </TableToolbar.Item>
                             <TableToolbar.Item>
                                 <Box width="300">
                                     <Search
@@ -376,45 +412,88 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                         </TableToolbar.ItemGroup>
                     </TableToolbar>
 
+                    {activeFiltersCount > 0 && (
+                        <Table.SubToolbar>
+                            <TableToolbar.ItemGroup position="start">
+                                <TableToolbar.Item>
+                                    <TagList
+                                        tags={activeFilters.map((filter, index) => ({
+                                            id: filter.fieldName,
+                                            children: `${filter.fieldName}: ${String(filter.value)}`,
+                                            removable: true
+                                        }))}
+                                        size="small"
+                                        maxVisibleTags={5}
+                                        onTagRemove={(tagId) => {
+                                            if (onRemoveFilter) {
+                                                onRemoveFilter(tagId);
+                                            }
+                                        }}
+                                    />
+                                </TableToolbar.Item>
+                            </TableToolbar.ItemGroup>
+                            <TableToolbar.ItemGroup position="end">
+                                <TableToolbar.Item>
+                                    <TextButton
+                                        size="small"
+                                        onClick={onClearAllFilters}
+                                        skin="destructive"
+                                    >
+                                        Clear All
+                                    </TextButton>
+                                </TableToolbar.Item>
+                            </TableToolbar.ItemGroup>
+                        </Table.SubToolbar>
+                    )}
+
                     {hasNoSubmissions ? (
                         <Table.EmptyState
                             title="No submissions found"
                             subtitle="There are no submissions for the selected form"
+                        />
+                    ) : searchFilteredSubmissions.length === 0 ? (
+                        <Table.EmptyState
+                            title="No results found"
+                            subtitle={
+                                activeFiltersCount > 0 && searchTerm
+                                    ? "No submissions match your search and filter criteria"
+                                    : activeFiltersCount > 0
+                                        ? "No submissions match your filter criteria"
+                                        : "No submissions match your search"
+                            }
                         />
                     ) : (
                         <Table.Content />
                     )}
                 </Table>
             </Card>
-            {/* Pagination */}
-            {
-                totalPages > 1 && (
-                    <Box direction="vertical" gap="SP1" align="center">
-                        <Pagination
-                            totalPages={totalPages}
-                            currentPage={currentPage}
-                            onChange={(event) => setCurrentPage(event.page)}
-                        />
-                        <Box textAlign="center">
-                            <Text size="small">
-                                Showing {startIndex + 1} to {endIndex} of {filteredSubmissions.length} submissions
-                                {searchTerm && ` (filtered from ${totalSubmissions} total)`}
-                            </Text>
-                        </Box>
-                    </Box>
-                )
-            }
 
-            {
-                totalPages <= 1 && (
-                    <Box align="center">
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <Box direction="vertical" gap="SP1" align="center">
+                    <Pagination
+                        totalPages={totalPages}
+                        currentPage={currentPage}
+                        onChange={(event) => setCurrentPage(event.page)}
+                    />
+                    <Box textAlign="center">
                         <Text size="small">
-                            Showing all {submissions.length} submissions
+                            Showing {startIndex + 1} to {endIndex} of {searchFilteredSubmissions.length} submissions
+                            {(activeFiltersCount > 0 || searchTerm) && ` (filtered from ${totalSubmissions} total)`}
                         </Text>
                     </Box>
-                )
-            }
-        </Box >
+                </Box>
+            )}
+
+            {totalPages <= 1 && searchFilteredSubmissions.length > 0 && (
+                <Box align="center">
+                    <Text size="small">
+                        Showing all {searchFilteredSubmissions.length} submissions
+                        {(activeFiltersCount > 0 || searchTerm) && ` (filtered from ${totalSubmissions} total)`}
+                    </Text>
+                </Box>
+            )}
+        </Box>
     );
 };
 
@@ -436,42 +515,36 @@ function getDefaultColumnWidth(field: FormField, index: number): string {
         case FieldType.BOOLEAN:
             return '180px';
         case FieldType.ARRAY:
-            return '320px'; // Arrays need more space for multiple values
+            return '320px';
         case FieldType.OBJECT:
-            return '280px'; // Objects need space for structured data
+            return '280px';
         case FieldType.TEXTAREA:
-            return '400px'; // Long text needs more space
+            return '400px';
         case FieldType.URL:
-            return '300px'; // URLs can be long
+            return '300px';
         case FieldType.NUMBER:
-            return '160px'; // Numbers are typically shorter
+            return '160px';
         case FieldType.SELECT:
-            return '200px'; // Select options are usually medium length
+            return '200px';
         case FieldType.TEXT:
-            // Fall through to check field name patterns for TEXT type
             break;
         default:
-            // Fall through to check field name patterns
             break;
     }
 
     // PRIORITY 2: Field Name Pattern-based widths (only for TEXT and unknown types)
-    // Name fields
     if (fieldName.includes('name')) {
         return '280px';
     }
 
-    // Address fields (if not already caught by type)
     if (fieldName.includes('address')) {
         return '360px';
     }
 
-    // Description/comment fields
     if (fieldName.includes('description')) {
         return '400px';
     }
 
-    // ID fields
     if (fieldName.includes('id') || fieldName.includes('guid')) {
         return '200px';
     }
