@@ -107,19 +107,13 @@ const SettingsPage: React.FC = () => {
   const [filterHeaderOptions] = useState([
     {
       value: 'Filter Name',
-      width: '3fr',
+      width: '4fr',
       sortable: false,
       align: 'left' as const,
     },
     {
       value: 'Type',
       width: '2fr',
-      sortable: false,
-      align: 'left' as const,
-    },
-    {
-      value: 'Enabled',
-      width: '1fr',
       sortable: false,
       align: 'left' as const,
     },
@@ -150,8 +144,7 @@ const SettingsPage: React.FC = () => {
     fieldName: filter.fieldName,
     label: filter.label,
     type: filter.type,
-    visible: filter.visible,
-    enabled: filter.enabled
+    visible: filter.visible
   })) : [];
 
   // Select all functionality for columns
@@ -177,23 +170,23 @@ const SettingsPage: React.FC = () => {
   };
 
   // Select all functionality for filters
-  const allFiltersEnabled = filterSettings ? filterSettings.filters.every(filter => filter.enabled) : false;
-  const someFiltersEnabled = filterSettings ? filterSettings.filters.some(filter => filter.enabled) : false;
+  const allFiltersVisible = filterSettings ? filterSettings.filters.every(filter => filter.visible) : false;
+  const someFiltersVisible = filterSettings ? filterSettings.filters.some(filter => filter.visible) : false;
 
   const getFilterCheckboxState = () => {
-    if (allFiltersEnabled) return 'checked';
-    if (someFiltersEnabled) return 'indeterminate';
+    if (allFiltersVisible) return 'checked';
+    if (someFiltersVisible) return 'indeterminate';
     return 'normal';
   };
 
   const handleSelectAllFilters = () => {
     if (!filterSettings) return;
-    const newEnabled = !allFiltersEnabled;
+    const newVisible = !allFiltersVisible;
     filterSettings.filters.forEach(filter => {
-      updateFilterEnabled(filter.fieldName, newEnabled);
+      updateFilterVisibility(filter.fieldName, newVisible);
     });
     dashboard.showToast({
-      message: newEnabled ? 'All filters enabled' : 'All filters disabled',
+      message: newVisible ? 'All filters shown' : 'All filters hidden',
       type: 'success',
     });
   };
@@ -400,8 +393,8 @@ const SettingsPage: React.FC = () => {
           showDivider
           showSelectionBorder={false}
           checkbox
-          checked={filter.enabled}
-          onCheckboxChange={() => updateFilterEnabled(filter.fieldName, !filter.enabled)}
+          checked={filter.visible}
+          onCheckboxChange={() => updateFilterVisibility(filter.fieldName, !filter.visible)}
           options={[
             {
               value: (
@@ -410,7 +403,7 @@ const SettingsPage: React.FC = () => {
                   <Badge skin="neutralLight" size="small">Filter</Badge>
                 </Box>
               ),
-              width: '3fr',
+              width: '4fr',
               align: 'left'
             },
             {
@@ -428,22 +421,11 @@ const SettingsPage: React.FC = () => {
             {
               value: (
                 <Badge
-                  skin={filter.enabled ? 'success' : 'neutralLight'}
+                  skin={filter.visible ? 'success' : 'neutralLight'}
                   size="small"
                 >
-                  {filter.enabled ? 'Enabled' : 'Disabled'}
+                  {filter.visible ? 'Visible' : 'Hidden'}
                 </Badge>
-              ),
-              width: '1fr',
-              align: 'left'
-            },
-            {
-              value: (
-                <Checkbox
-                  size="small"
-                  checked={filter.visible}
-                  onChange={() => updateFilterVisibility(filter.fieldName, !filter.visible)}
-                />
               ),
               width: '1fr',
               align: 'left'
@@ -491,7 +473,7 @@ const SettingsPage: React.FC = () => {
 
   const visibleColumnsCount = settings?.columns.filter(col => col.visible).length || 0;
   const totalColumnsCount = settings?.columns.length || 0;
-  const enabledFiltersCount = filterSettings?.filters.filter(filter => filter.enabled).length || 0;
+  const visibleFiltersCount = filterSettings?.filters.filter(filter => filter.visible).length || 0;
   const totalFiltersCount = filterSettings?.filters.length || 0;
 
   return (
@@ -653,7 +635,7 @@ const SettingsPage: React.FC = () => {
                           <Text size="small" color="secondary">
                             {activeTab === 1
                               ? `${visibleColumnsCount} of ${totalColumnsCount} columns visible`
-                              : `${enabledFiltersCount} of ${totalFiltersCount} filters enabled`
+                              : `${visibleFiltersCount} of ${totalFiltersCount} filters visible`
                             }
                           </Text>
                         </TableToolbar.Item>
@@ -724,14 +706,14 @@ const SettingsPage: React.FC = () => {
                             <Text align="bottom" size="small" weight="bold">{totalFiltersCount}</Text>
                           </Box>
                           <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                            <Text size="small">Enabled Filters:</Text>
-                            <Text size="small" align="bottom" weight="bold" color={enabledFiltersCount > 0 ? 'success' : 'warning'}>
-                              {enabledFiltersCount}
+                            <Text size="small">Visible Filters:</Text>
+                            <Text size="small" align="bottom" weight="bold" color={visibleFiltersCount > 0 ? 'success' : 'warning'}>
+                              {visibleFiltersCount}
                             </Text>
                           </Box>
                           <Box direction="horizontal" gap="SP2" style={{ alignItems: "center" }}>
-                            <Text size="small" align="bottom">Disabled Filters:</Text>
-                            <Text size="small" align="bottom" weight="bold">{totalFiltersCount - enabledFiltersCount}</Text>
+                            <Text size="small" align="bottom">Hidden Filters:</Text>
+                            <Text size="small" align="bottom" weight="bold">{totalFiltersCount - visibleFiltersCount}</Text>
                           </Box>
                         </>
                       )}
