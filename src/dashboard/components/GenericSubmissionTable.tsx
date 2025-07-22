@@ -366,26 +366,7 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                     </Heading>
                                 </TableToolbar.Item>
                             )}
-                            <TableToolbar.Item>
-                                <Text size="medium" weight="normal">
-                                    {getSubmissionCountText()}
-                                </Text>
-                            </TableToolbar.Item>
-                            <TableToolbar.Item>
-                                <Box direction="horizontal" gap="SP2" align="center">
-                                    <Badge skin="neutralLight" size="small">
-                                        {safeVisibleColumns.length} of {(() => {
-                                            const systemFields = ['_createdDate'];
-                                            return formFields.length + systemFields.length;
-                                        })()} columns shown
-                                    </Badge>
-                                    {activeFiltersCount > 0 && (
-                                        <Badge skin="standard" size="small">
-                                            {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} active
-                                        </Badge>
-                                    )}
-                                </Box>
-                            </TableToolbar.Item>
+
                         </TableToolbar.ItemGroup>
                         <TableToolbar.ItemGroup position="end">
                             <TableToolbar.Item>
@@ -417,11 +398,27 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                             <TableToolbar.ItemGroup position="start">
                                 <TableToolbar.Item>
                                     <TagList
-                                        tags={activeFilters.map((filter, index) => ({
-                                            id: filter.fieldName,
-                                            children: `${filter.fieldName}: ${String(filter.value)}`,
-                                            removable: true
-                                        }))}
+                                        tags={activeFilters.flatMap((filter) => {
+                                            // If the filter value is an array, create individual tags for each value
+                                            if (Array.isArray(filter.value)) {
+                                                return filter.value.map((value: any, index: number) => ({
+                                                    id: `${filter.fieldName}-${index}`,
+                                                    children: `${filter.fieldName}: ${String(value)}`,
+                                                    removable: true,
+                                                    fieldName: filter.fieldName,
+                                                    filterValue: value
+                                                }));
+                                            } else {
+                                                // Single value filter
+                                                return [{
+                                                    id: filter.fieldName,
+                                                    children: `${filter.fieldName}: ${String(filter.value)}`,
+                                                    removable: true,
+                                                    fieldName: filter.fieldName,
+                                                    filterValue: filter.value
+                                                }];
+                                            }
+                                        })}
                                         size="small"
                                         maxVisibleTags={5}
                                         actionButton={{
@@ -429,8 +426,10 @@ export const GenericSubmissionTable: React.FC<GenericSubmissionTableProps> = ({
                                             onClick: onClearAllFilters
                                         }}
                                         onTagRemove={(tagId) => {
+                                            // Extract the field name from the tag ID
+                                            const fieldName = tagId.includes('-') ? tagId.split('-')[0] : tagId;
                                             if (onRemoveFilter) {
-                                                onRemoveFilter(tagId);
+                                                onRemoveFilter(fieldName);
                                             }
                                         }}
                                     />

@@ -54,6 +54,8 @@ export const FilterSidePanel: React.FC<FilterSidePanelProps> = ({
 
     const handleFiltersChange = (filters: FilterValue[]) => {
         setTempFilters(filters);
+        // Apply filters immediately
+        onFiltersApply(filters);
     };
 
     const handleClearAll = () => {
@@ -81,8 +83,6 @@ export const FilterSidePanel: React.FC<FilterSidePanelProps> = ({
     if (!isOpen) return null;
 
     return (
-
-
         <div
             style={{
                 position: 'fixed',
@@ -90,6 +90,7 @@ export const FilterSidePanel: React.FC<FilterSidePanelProps> = ({
                 right: 0,
                 height: '100vh',
                 width: '420px',
+                transition: 'right 0.9s ease 0.9s',
                 zIndex: 1000,
                 boxShadow: '0 3px 24px 0 rgba(22, 45, 61, 0.18), 0 8px 8px 0 rgba(22, 45, 61, 0.12)',
                 backgroundColor: 'white'
@@ -105,7 +106,7 @@ export const FilterSidePanel: React.FC<FilterSidePanelProps> = ({
                     }
                 />
 
-                <SidePanel.Content>
+                <SidePanel.Content noPadding >
                     <GenericFilterPanel
                         availableFilters={visibleFilters}
                         activeFilters={tempFilters}
@@ -122,19 +123,20 @@ export const FilterSidePanel: React.FC<FilterSidePanelProps> = ({
                             onClick={handleCancel}
                             fullWidth
                         >
-                            Cancel
+                            Close
                         </Button>
-                        <Button
-                            priority="primary"
-                            onClick={handleApply}
-                            disabled={!hasChanges}
-                            fullWidth
-                        >
-                            {getActiveFilterCount() > 0
-                                ? `Apply ${getActiveFilterCount()} Filter${getActiveFilterCount() !== 1 ? 's' : ''}`
-                                : 'Clear Filters'
-                            }
-                        </Button>
+                        {getActiveFilterCount() > 0 && (
+                            <Button
+                                priority="primary"
+                                onClick={() => {
+                                    onFiltersApply([]);
+                                    onClose();
+                                }}
+                                fullWidth
+                            >
+                                Clear All Filters
+                            </Button>
+                        )}
                     </Box>
                 </SidePanel.Footer>
             </SidePanel>

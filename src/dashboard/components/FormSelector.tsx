@@ -47,7 +47,6 @@ export const FormSelector: React.FC<FormSelectorProps> = ({
     return (
         <Box direction="horizontal" gap="SP3">
             <Box direction="vertical" gap="SP1">
-                <Text size="tiny" color="secondary">Select form</Text>
                 <Dropdown
                     placeholder="Choose form..."
                     options={dropdownOptions}
@@ -71,7 +70,7 @@ export const FormSelector: React.FC<FormSelectorProps> = ({
 
             <Box direction="horizontal" gap="SP2">
                 {selectedForm && (
-                    <Box direction="horizontal" gap="SP2" style={{ alignItems: "flex-end" }}>
+                    <Box direction="horizontal" gap="SP2" style={{ alignItems: "top" }}>
                         <Badge skin="standard" size="small">
                             {selectedForm.submissionCount} submissions
                         </Badge>
@@ -83,6 +82,20 @@ export const FormSelector: React.FC<FormSelectorProps> = ({
                         <Badge skin="success" size="small">
                             Active
                         </Badge>
+                        {/* <Box direction="horizontal" gap="SP2" align="center">
+                            <Badge skin="neutralLight" size="small">
+                                {safeVisibleColumns.length} of {(() => {
+                                    const systemFields = ['_createdDate'];
+                                    return formFields.length + systemFields.length;
+                                })()} columns shown
+                            </Badge>
+                            {activeFiltersCount > 0 && (
+                                <Badge skin="standard" size="small">
+                                    {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} active
+                                </Badge>
+                            )}
+                        </Box> */}
+
                     </Box>
                 )}
             </Box>

@@ -90,6 +90,7 @@ export const GenericFilterPanel: React.FC<GenericFilterPanelProps> = ({
             newFilters.push({ fieldName, value, operator: operator as FilterOperator });
         }
 
+        // Apply filters immediately
         onFiltersChange(newFilters);
     };
 
@@ -460,8 +461,34 @@ export const GenericFilterPanel: React.FC<GenericFilterPanelProps> = ({
         return true;
     };
 
-    const getActiveFilterCount = () => {
+    const getTotalActiveFilterCount = () => {
         return activeFilters.length;
+    };
+
+    const getFieldFilterCount = (field: FormFieldType): number => {
+        const filter = activeFilters.find(f => f.fieldName === field.name);
+        if (!filter) return 0;
+
+        // For array filters (like multiselect), count the selected values
+        if (Array.isArray(filter.value)) {
+            return filter.value.length;
+        }
+
+        // For single value filters, return 1
+        return 1;
+    };
+
+    const getActiveFilterCount = (field: FormFieldType): number => {
+        const filter = activeFilters.find(f => f.fieldName === field.name);
+        if (!filter) return 0;
+
+        // For array filters (like multiselect), count the selected values
+        if (Array.isArray(filter.value)) {
+            return filter.value.length;
+        }
+
+        // For single value filters, return 1
+        return 1;
     };
 
     const accordionItems = availableFilters.map(field =>
@@ -473,56 +500,25 @@ export const GenericFilterPanel: React.FC<GenericFilterPanelProps> = ({
                             {field.label}
                         </Text>
                         {isFilterActive(field) && (
-                            <Badge skin="success" size="tiny">Active</Badge>
+                            <Text size="tiny" color="secondary">
+                                ({getFieldFilterCount(field)})
+                            </Text>
                         )}
                     </Box>
                     <Box direction="horizontal" gap="SP1" align="center">
                         <Text size="tiny" color="secondary">
                             {field.type}
                         </Text>
-                        {isFilterActive(field) && (
-                            <IconButton
-                                size="tiny"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeFilter(field.name);
-                                }}
-                            >
-                                <Icons.X />
-                            </IconButton>
-                        )}
                     </Box>
                 </Box>
             ),
             children: renderFilterContent(field),
-            initiallyOpen: isFilterActive(field)
+            initiallyOpen: isFilterActive(field),
         })
     );
 
     return (
         <Box direction="vertical" gap="SP3">
-            {/* Header */}
-            <Box direction="horizontal" gap="SP2" align="center" style={{ justifyContent: 'space-between' }}>
-                <Box direction="horizontal" gap="SP2" align="center">
-                    <Text size="medium" weight="bold">
-                        Filters
-                    </Text>
-                    {getActiveFilterCount() > 0 && (
-                        <Badge skin="primary" size="small">
-                            {getActiveFilterCount()} active
-                        </Badge>
-                    )}
-                </Box>
-                {getActiveFilterCount() > 0 && (
-                    <TextButton
-                        size="small"
-                        onClick={onClearAll}
-                        skin="destructive"
-                    >
-                        Clear All
-                    </TextButton>
-                )}
-            </Box>
 
             {/* No filters available */}
             {availableFilters.length === 0 && (
@@ -536,10 +532,12 @@ export const GenericFilterPanel: React.FC<GenericFilterPanelProps> = ({
             {/* Filter Accordion */}
             {availableFilters.length > 0 && (
                 <Accordion
+                    hideShadow={true}
                     items={accordionItems}
                     multiple={true}
-                    skin="light"
-                    size="small"
+                    skin="standard"
+                    size="medium"
+
                 />
             )}
         </Box>

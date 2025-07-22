@@ -578,7 +578,7 @@ const SettingsPage: React.FC = () => {
                               </TextButton>
                             </Box>
                           ) : (
-                            <Box direction="horizontal" gap="SP2" align="center">
+                            <Box direction="horizontal" gap="SP2" align="center" style={{ alignItems: "center" }}>
                               <Box width="200px">
                                 <Tooltip
                                   content={`Leave empty to use default name: ${selectedForm.name}`}

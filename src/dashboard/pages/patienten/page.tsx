@@ -15,7 +15,8 @@ import {
   TextButton,
   Loader,
   Card,
-  Badge
+  Badge,
+  IconButton
 } from '@wix/design-system';
 import '@wix/design-system/styles.global.css';
 import * as Icons from '@wix/wix-ui-icons-common';
@@ -176,7 +177,7 @@ const GenericFormDashboard: React.FC = () => {
 
   const handleRefresh = async () => {
     dashboard.showToast({
-      message: 'Updating data...',
+      message: 'Data updated',
       type: 'success',
     });
     await loadSubmissions();
@@ -315,67 +316,72 @@ const GenericFormDashboard: React.FC = () => {
 
   return (
     <WixDesignSystemProvider features={{ newColorsBranding: true }}>
-      <Page minWidth={950}>
-        <Page.Header
-          title="Form Dashboard"
-          subtitle="Manage and view form submissions across all your forms"
-          actionsBar={
-            <Box direction="horizontal" gap="SP3">
-              <Button
-                onClick={handleNavigateToSettings}
-                prefixIcon={<Icons.Settings />}
-                priority="secondary"
-                disabled={!selectedForm}
-              >
-                Table Settings
-              </Button>
-              <Button
-                onClick={handleRefresh}
-                prefixIcon={<Icons.Refresh />}
-                priority="secondary"
-              >
-                Refresh
-              </Button>
-              <Button
-                onClick={handleAddNewRegistration}
-                prefixIcon={<Icons.Add />}
-                disabled={true}
-              >
-                New Form
-              </Button>
-            </Box>
-          }
-        />
+      <div style={{
+        display: 'block',
+        overflow: 'hidden',
+        position: 'relative',
+        transition: 'margin-right 0.4s ease 0s',
+        marginRight: isFilterPanelOpen ? '420px' : '0px'
+      }}>
+        <Page minWidth={950}>
+          <Page.Header
+            title="Form Dashboard"
+            subtitle="Manage and view form submissions across all your forms"
+            actionsBar={
+              <Box direction="horizontal" gap="SP3">
+                <IconButton size="medium" onClick={handleRefresh}
+                  priority="secondary">
+                  <Icons.Refresh />
+                </IconButton>
+                <Button
+                  onClick={handleNavigateToSettings}
+                  prefixIcon={<Icons.Settings />}
+                  priority="secondary"
+                  disabled={!selectedForm}
+                >
+                  Table Settings
+                </Button>
 
-        <Page.Content>
-          <Box direction="vertical" gap="SP4">
-            {/* Form Selector */}
-            <Card>
-              <Card.Content>
-                <Box direction="horizontal" gap="SP4" align="center" style={{ justifyContent: "space-between" }}>
-                  <FormSelector
-                    availableForms={availableForms}
-                    selectedFormId={selectedFormId}
-                    onFormSelect={setSelectedFormId}
-                    loading={loading}
-                  />
-                  <Box direction="horizontal" gap="SP2" align="center">
-                    <TextButton
-                      suffixIcon={<Icons.InfoCircle size="20px" />}
-                      size="small"
-                      underline="always"
-                      onClick={() => setIsWhatsNewOpen(true)}
-                      skin="standard"
-                    >
-                      Info
-                    </TextButton>
+                <Button
+                  onClick={handleAddNewRegistration}
+                  prefixIcon={<Icons.Add />}
+                  disabled={true}
+                >
+                  New Form
+                </Button>
+              </Box>
+            }
+          />
+
+          <Page.Content>
+            <Box direction="vertical" gap="SP4">
+              {/* Form Selector */}
+              <Card>
+                <Card.Content>
+                  <Box direction="horizontal" gap="SP4" align="center" style={{ justifyContent: "space-between" }}>
+                    <FormSelector
+                      availableForms={availableForms}
+                      selectedFormId={selectedFormId}
+                      onFormSelect={setSelectedFormId}
+                      loading={loading}
+                    />
+                    <Box direction="horizontal" gap="SP2" align="center">
+                      <TextButton
+                        suffixIcon={<Icons.InfoCircle size="20px" />}
+                        size="small"
+                        underline="always"
+                        onClick={() => setIsWhatsNewOpen(true)}
+                        skin="standard"
+                      >
+                        Info
+                      </TextButton>
+                    </Box>
                   </Box>
-                </Box>
-              </Card.Content>
-            </Card>
+                </Card.Content>
+              </Card>
 
-            {/* Statistics Cards */}
-            {/* {selectedForm && filteredSubmissions.length > 0 && (
+              {/* Statistics Cards */}
+              {/* {selectedForm && filteredSubmissions.length > 0 && (
               <StatisticsCards
                 totalPatients={filteredSubmissions.length}
                 waitingTime={statistics.waitingTime}
@@ -386,149 +392,162 @@ const GenericFormDashboard: React.FC = () => {
               />
             )} */}
 
-            {/* Main Content */}
-            {selectedForm ? (
-              <GenericSubmissionTable
-                key={selectedFormId} // Force re-render when form changes
-                submissions={filteredSubmissions}
-                formFields={selectedForm.fields}
-                visibleColumns={visibleColumns}
-                columnSettings={tableSettings?.columns || []}
-                formId={selectedFormId}
-                formName={selectedForm.name}
-                onViewSubmission={handleViewSubmission}
-                onPrintSubmission={handlePrintSubmission}
-                onDeleteSubmission={handleDeleteSubmission}
-                onEditSubmission={handleEditSubmission}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                totalSubmissions={selectedFormSubmissions.length}
-                filteredSubmissions={filteredSubmissions.length}
-                activeFiltersCount={activeFilters.length}
-                onOpenFilters={handleOpenFilters}
-                onClearAllFilters={handleClearAllFilters}
-                onRemoveFilter={handleRemoveFilter}
-                activeFilters={activeFilters}
-              />
-            ) : (
-              <Box
-                textAlign="center"
-                padding="40px"
-                backgroundColor="white"
-                borderRadius="8px"
-                border="1px solid #e0e0e0"
-              >
-                <Text size="medium" weight="bold" marginBottom="SP2">
-                  No form selected
+              {/* Main Content */}
+              {selectedForm ? (
+                <GenericSubmissionTable
+                  key={selectedFormId} // Force re-render when form changes
+                  submissions={filteredSubmissions}
+                  formFields={selectedForm.fields}
+                  visibleColumns={visibleColumns}
+                  columnSettings={tableSettings?.columns || []}
+                  formId={selectedFormId}
+                  formName={selectedForm.name}
+                  onViewSubmission={handleViewSubmission}
+                  onPrintSubmission={handlePrintSubmission}
+                  onDeleteSubmission={handleDeleteSubmission}
+                  onEditSubmission={handleEditSubmission}
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  totalSubmissions={selectedFormSubmissions.length}
+                  filteredSubmissions={filteredSubmissions.length}
+                  activeFiltersCount={activeFilters.length}
+                  onOpenFilters={handleOpenFilters}
+                  onClearAllFilters={handleClearAllFilters}
+                  onRemoveFilter={handleRemoveFilter}
+                  activeFilters={activeFilters}
+                />
+              ) : (
+                <Box
+                  textAlign="center"
+                  padding="40px"
+                  backgroundColor="white"
+                  borderRadius="8px"
+                  border="1px solid #e0e0e0"
+                >
+                  <Text size="medium" weight="bold" marginBottom="SP2">
+                    No form selected
+                  </Text>
+                  <Text size="medium" color="secondary">
+                    Choose a form from the dropdown above to view submissions.
+                  </Text>
+                </Box>
+              )}
+            </Box>
+          </Page.Content>
+        </Page>
+
+        {/* Filter Side Panel */}
+        {selectedForm && (
+          <FilterSidePanel
+            isOpen={isFilterPanelOpen}
+            onClose={handleCloseFilters}
+            formId={selectedFormId}
+            formFields={selectedForm.fields}
+            submissions={selectedFormSubmissions}
+            onFiltersApply={handleApplyFilters}
+            currentFilters={activeFilters}
+          />
+        )}
+
+        {/* Modals */}
+        {isModalOpen && selectedSubmission && (
+          <PatientDetailsModal
+            patient={selectedSubmission as PatientSubmission}
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            onPrint={handlePrintSubmission}
+          />
+        )}
+
+        {isDeleteModalOpen && submissionToDelete && (
+          <Modal
+            isOpen={isDeleteModalOpen}
+            onRequestClose={cancelDeleteSubmission}
+            shouldCloseOnOverlayClick={true}
+            screen="desktop"
+          >
+            <MessageModalLayout
+              theme="destructive"
+              onCloseButtonClick={cancelDeleteSubmission}
+              primaryButtonText="Delete"
+              secondaryButtonText="Cancel"
+              primaryButtonOnClick={confirmDeleteSubmission}
+              secondaryButtonOnClick={cancelDeleteSubmission}
+              title="Delete submission"
+              content={
+                <Text>
+                  You are about to delete the submission <b>{getSubmissionDisplayName(submissionToDelete)}</b>.
+                  It can be restored later from the trash collection.
                 </Text>
-                <Text size="medium" color="secondary">
-                  Choose a form from the dropdown above to view submissions.
-                </Text>
-              </Box>
-            )}
-          </Box>
-        </Page.Content>
-      </Page>
+              }
+            />
+          </Modal>
+        )}
 
-      {/* Filter Side Panel */}
-      {selectedForm && (
-        <FilterSidePanel
-          isOpen={isFilterPanelOpen}
-          onClose={handleCloseFilters}
-          formId={selectedFormId}
-          formFields={selectedForm.fields}
-          submissions={selectedFormSubmissions}
-          onFiltersApply={handleApplyFilters}
-          currentFilters={activeFilters}
-        />
-      )}
-
-      {/* Modals */}
-      {isModalOpen && selectedSubmission && (
-        <PatientDetailsModal
-          patient={selectedSubmission as PatientSubmission}
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          onPrint={handlePrintSubmission}
-        />
-      )}
-
-      {isDeleteModalOpen && submissionToDelete && (
         <Modal
-          isOpen={isDeleteModalOpen}
-          onRequestClose={cancelDeleteSubmission}
+          isOpen={isWhatsNewOpen}
+          onRequestClose={() => setIsWhatsNewOpen(false)}
           shouldCloseOnOverlayClick={true}
           screen="desktop"
         >
-          <MessageModalLayout
-            theme="destructive"
-            onCloseButtonClick={cancelDeleteSubmission}
-            primaryButtonText="Delete"
-            secondaryButtonText="Cancel"
-            primaryButtonOnClick={confirmDeleteSubmission}
-            secondaryButtonOnClick={cancelDeleteSubmission}
-            title="Delete submission"
-            content={
-              <Text>
-                You are about to delete the submission <b>{getSubmissionDisplayName(submissionToDelete)}</b>.
-                It can be restored later from the trash collection.
-              </Text>
-            }
-          />
+          <Box padding="24px" background="white" direction="vertical" borderRadius="8px" gap="16px">
+            <Box textAlign="left">
+              <Text size="medium" weight="bold" marginBottom="16px">Generic Form Dashboard</Text>
+            </Box>
+
+            <Box textAlign="left" direction="vertical" align="left">
+              <Box direction="vertical" gap="8px" marginBottom="16px" textAlign="left">
+                <Text>•  Now supports all Wix forms automatically</Text>
+                <Text>•  Dynamic form selection via dropdown</Text>
+                <Text>•  Automatic field detection and display</Text>
+                <Text>•  Smart column arrangement based on field types</Text>
+                <Text>•  Enhanced data display for arrays, objects, and images</Text>
+                <Text>•  Generic search function across all fields</Text>
+                <Text>•  Automatic type detection (email, phone, date, etc.)</Text>
+                <Text>•  NEW: Table Settings - configure column visibility and order</Text>
+                <Text>•  NEW: Advanced Filters - filter by any field type</Text>
+              </Box>
+
+              <Box textAlign="left" marginTop="16px">
+                <Text size="medium" weight="bold" marginBottom="16px">Features</Text>
+              </Box>
+              <Box direction="vertical" gap="8px" marginTop="16px" textAlign="left">
+                <Text>•  Select a form from the dropdown list</Text>
+                <Text>•  All form fields are automatically displayed as table columns</Text>
+                <Text>•  Use "Table Settings" to hide/show columns and reorder them</Text>
+                <Text>•  Use "Filters" to filter data by any field type</Text>
+                <Text>•  Search works across all text fields</Text>
+                <Text>•  Click on date columns to sort</Text>
+                <Text>•  Arrays displayed as tags, objects as structured data</Text>
+                <Text>•  Images and files shown with previews</Text>
+                <Text>•  Settings are automatically saved per form</Text>
+                <Text>•  Filters adapt to field types (text, date, number, boolean, etc.)</Text>
+              </Box>
+
+              <Box direction="horizontal" gap="12px" align="right" marginTop="24px">
+                <Button
+                  onClick={() => setIsWhatsNewOpen(false)}
+                  priority="primary"
+                >
+                  Got it
+                </Button>
+              </Box>
+            </Box>
+          </Box>
         </Modal>
-      )}
-
-      <Modal
-        isOpen={isWhatsNewOpen}
-        onRequestClose={() => setIsWhatsNewOpen(false)}
-        shouldCloseOnOverlayClick={true}
-        screen="desktop"
-      >
-        <Box padding="24px" background="white" direction="vertical" borderRadius="8px" gap="16px">
-          <Box textAlign="left">
-            <Text size="medium" weight="bold" marginBottom="16px">Generic Form Dashboard</Text>
-          </Box>
-
-          <Box textAlign="left" direction="vertical" align="left">
-            <Box direction="vertical" gap="8px" marginBottom="16px" textAlign="left">
-              <Text>•  Now supports all Wix forms automatically</Text>
-              <Text>•  Dynamic form selection via dropdown</Text>
-              <Text>•  Automatic field detection and display</Text>
-              <Text>•  Smart column arrangement based on field types</Text>
-              <Text>•  Enhanced data display for arrays, objects, and images</Text>
-              <Text>•  Generic search function across all fields</Text>
-              <Text>•  Automatic type detection (email, phone, date, etc.)</Text>
-              <Text>•  NEW: Table Settings - configure column visibility and order</Text>
-              <Text>•  NEW: Advanced Filters - filter by any field type</Text>
-            </Box>
-
-            <Box textAlign="left" marginTop="16px">
-              <Text size="medium" weight="bold" marginBottom="16px">Features</Text>
-            </Box>
-            <Box direction="vertical" gap="8px" marginTop="16px" textAlign="left">
-              <Text>•  Select a form from the dropdown list</Text>
-              <Text>•  All form fields are automatically displayed as table columns</Text>
-              <Text>•  Use "Table Settings" to hide/show columns and reorder them</Text>
-              <Text>•  Use "Filters" to filter data by any field type</Text>
-              <Text>•  Search works across all text fields</Text>
-              <Text>•  Click on date columns to sort</Text>
-              <Text>•  Arrays displayed as tags, objects as structured data</Text>
-              <Text>•  Images and files shown with previews</Text>
-              <Text>•  Settings are automatically saved per form</Text>
-              <Text>•  Filters adapt to field types (text, date, number, boolean, etc.)</Text>
-            </Box>
-
-            <Box direction="horizontal" gap="12px" align="right" marginTop="24px">
-              <Button
-                onClick={() => setIsWhatsNewOpen(false)}
-                priority="primary"
-              >
-                Got it
-              </Button>
-            </Box>
-          </Box>
-        </Box>
-      </Modal>
+        {/* Filter Side Panel */}
+        {selectedForm && (
+          <FilterSidePanel
+            isOpen={isFilterPanelOpen}
+            onClose={handleCloseFilters}
+            formId={selectedFormId}
+            formFields={selectedForm.fields}
+            submissions={selectedFormSubmissions}
+            onFiltersApply={handleApplyFilters}
+            currentFilters={activeFilters}
+          />
+        )}
+      </div>
     </WixDesignSystemProvider>
   );
 };
